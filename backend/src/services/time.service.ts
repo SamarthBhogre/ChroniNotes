@@ -1,18 +1,20 @@
 import { BrowserWindow } from "electron"
 import { getDb } from "../db"
 
-let timer: NodeJS.Timeout | null = null
-let mode: "work" | "break" = "work"
-let secondsLeft = 0
+/* ---------------- INTERNAL STATE ---------------- */
 
-/* ================= TYPES ================= */
+let timer: NodeJS.Timeout | null = null
+let seconds = 0
+let mode: "work" | "break" = "work"
+
+/* ---------------- TYPES ---------------- */
 
 type PomodoroSettingsRow = {
   work_minutes: number
   break_minutes: number
 }
 
-/* ================= SETTINGS ================= */
+/* ---------------- SETTINGS ---------------- */
 
 export function getSettings() {
   const db = getDb()
@@ -29,19 +31,22 @@ export function getSettings() {
   }
 }
 
-export function updateSettings(settings: {
-  workMinutes: number
+export function updateSettings(
+  workMinutes: number,
   breakMinutes: number
-}) {
+) {
   const db = getDb()
+
+  const work = Math.max(1, workMinutes)
+  const brk = Math.max(1, breakMinutes)
 
   db.prepare("DELETE FROM pomodoro_settings").run()
   db.prepare(
     "INSERT INTO pomodoro_settings (work_minutes, break_minutes) VALUES (?, ?)"
-  ).run(settings.workMinutes, settings.breakMinutes)
+  ).run(work, brk)
 }
 
-/* ================= TIMER ================= */
+/* ---------------- TIMER LOGIC ---------------- */
 
 export function startPomodoro(window?: BrowserWindow) {
   if (timer) return
@@ -49,19 +54,19 @@ export function startPomodoro(window?: BrowserWindow) {
   const settings = getSettings()
 
   mode = "work"
-  secondsLeft = settings.workMinutes * 60
+  seconds = settings.workMinutes * 60
 
   timer = setInterval(() => {
-    secondsLeft--
+    seconds--
 
     window?.webContents.send("timer:update", {
-      seconds: secondsLeft,
+      seconds,
       mode,
     })
 
-    if (secondsLeft <= 0) {
+    if (seconds <= 0) {
       mode = mode === "work" ? "break" : "work"
-      secondsLeft =
+      seconds =
         (mode === "work"
           ? settings.workMinutes
           : settings.breakMinutes) * 60

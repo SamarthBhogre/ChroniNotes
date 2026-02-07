@@ -1,25 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerTimerHandlers = registerTimerHandlers;
+exports.registerTimeHandlers = registerTimeHandlers;
 const electron_1 = require("electron");
 const time_service_1 = require("../services/time.service");
-let mainWindow = null;
-function registerTimerHandlers(window) {
-    if (window) {
-        mainWindow = window;
-    }
-    electron_1.ipcMain.handle("timer:start", () => {
-        if (mainWindow) {
-            (0, time_service_1.startPomodoro)(mainWindow);
-        }
+function registerTimeHandlers(window) {
+    electron_1.ipcMain.handle("pomodoro:start", () => {
+        (0, time_service_1.startPomodoro)(window);
     });
-    electron_1.ipcMain.handle("timer:stop", () => {
+    electron_1.ipcMain.handle("pomodoro:stop", () => {
         (0, time_service_1.stopPomodoro)();
     });
     electron_1.ipcMain.handle("pomodoro:getSettings", () => {
         return (0, time_service_1.getSettings)();
     });
-    electron_1.ipcMain.handle("pomodoro:updateSettings", (_, settings) => {
-        (0, time_service_1.updateSettings)(settings);
+    electron_1.ipcMain.handle("pomodoro:updateSettings", (_, payload) => {
+        (0, time_service_1.updateSettings)(payload.workMinutes, payload.breakMinutes);
     });
 }

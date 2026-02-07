@@ -8,18 +8,14 @@ import {
 
 let mainWindow: BrowserWindow | null = null
 
-export function registerTimerHandlers(window?: BrowserWindow) {
-  if (window) {
-    mainWindow = window
-  }
+export function registerTimerHandlers(win: BrowserWindow) {
+  mainWindow = win
 
-  ipcMain.handle("timer:start", () => {
-    if (mainWindow) {
-      startPomodoro(mainWindow)
-    }
+  ipcMain.handle("pomodoro:start", () => {
+    startPomodoro(mainWindow!)
   })
 
-  ipcMain.handle("timer:stop", () => {
+  ipcMain.handle("pomodoro:stop", () => {
     stopPomodoro()
   })
 
@@ -29,8 +25,8 @@ export function registerTimerHandlers(window?: BrowserWindow) {
 
   ipcMain.handle(
     "pomodoro:updateSettings",
-    (_, settings: { workMinutes: number; breakMinutes: number }) => {
-      updateSettings(settings)
+    (_, { workMinutes, breakMinutes }) => {
+      updateSettings(workMinutes, breakMinutes)
     }
   )
 }

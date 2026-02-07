@@ -1,9 +1,9 @@
 import { app, BrowserWindow } from "electron"
 import path from "path"
-import { registerIpcHandlers } from "./ipc"
 import { initDatabase } from "./db"
+import { registerIpcHandlers } from "./ipc"
 
-let mainWindow: BrowserWindow | null = null
+let mainWindow: BrowserWindow
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -20,12 +20,9 @@ function createWindow() {
 app.whenReady().then(() => {
   initDatabase()
   createWindow()
-  registerIpcHandlers(mainWindow!)
+  registerIpcHandlers(mainWindow)
 })
 
-
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit()
-  }
+  if (process.platform !== "darwin") app.quit()
 })

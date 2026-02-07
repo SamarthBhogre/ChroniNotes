@@ -7,42 +7,46 @@ exports.stopPomodoro = stopPomodoro;
 const db_1 = require("../db");
 let timer = null;
 let mode = "work";
-let secondsLeft = 0;
-/* ================= SETTINGS ================= */
+let seconds = 0;
 function getSettings() {
     const db = (0, db_1.getDb)();
     const row = db
-        .prepare("SELECT work_minutes, break_minutes FROM pomodoro_settings LIMIT 1")
+        .prepare(`SELECT work_minutes, break_minutes
+       FROM pomodoro_settings
+       LIMIT 1`)
         .get();
     return {
         workMinutes: row?.work_minutes ?? 25,
         breakMinutes: row?.break_minutes ?? 5,
     };
 }
-function updateSettings(settings) {
+function updateSettings(workMinutes, breakMinutes) {
     const db = (0, db_1.getDb)();
-    db.prepare("DELETE FROM pomodoro_settings").run();
-    db.prepare("INSERT INTO pomodoro_settings (work_minutes, break_minutes) VALUES (?, ?)").run(settings.workMinutes, settings.breakMinutes);
+    if (!workMinutes || !breakMinutes) {
+        throw new Error("Invalid pomodoro settings");
+    }
+    db.prepare(`DELETE FROM pomodoro_settings`).run();
+    db.prepare(`INSERT INTO pomodoro_settings (work_minutes, break_minutes)
+     VALUES (?, ?)`).run(workMinutes, breakMinutes);
 }
-/* ================= TIMER ================= */
 function startPomodoro(window) {
     if (timer)
         return;
     const settings = getSettings();
     mode = "work";
-    secondsLeft = settings.workMinutes * 60;
+    seconds = settings.workMinutes * 60;
     timer = setInterval(() => {
-        secondsLeft--;
-        window?.webContents.send("timer:update", {
-            seconds: secondsLeft,
+        seconds--;
+        window.webContents.send("timer:update", {
+            seconds,
             mode,
         });
-        if (secondsLeft <= 0) {
+        if (seconds <= 0) {
             mode = mode === "work" ? "break" : "work";
-            secondsLeft =
-                (mode === "work"
-                    ? settings.workMinutes
-                    : settings.breakMinutes) * 60;
+            seconds =
+                mode === "work"
+                    ? settings.workMinutes * 60
+                    : settings.breakMinutes * 60;
         }
     }, 1000);
 }

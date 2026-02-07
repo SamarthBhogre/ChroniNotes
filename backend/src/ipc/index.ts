@@ -1,13 +1,10 @@
-import { registerTaskHandlers } from "./tasks.ipc"
-import { registerTimerHandlers } from "./time.ipc"
 import { BrowserWindow } from "electron"
+import { registerTaskHandlers } from "./tasks.ipc"
+import { registerTimeHandlers } from "./time.ipc"
 
-let registered = false
-
-export function registerIpcHandlers(window: BrowserWindow) {
-  if (registered) return
-  registered = true
-
+export function registerIpcHandlers(
+  window: BrowserWindow
+) {
   registerTaskHandlers()
-  registerTimerHandlers(window)
+  registerTimeHandlers(window)
 }

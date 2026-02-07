@@ -5,8 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
-const ipc_1 = require("./ipc");
 const db_1 = require("./db");
+const ipc_1 = require("./ipc");
 let mainWindow = null;
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -21,10 +21,11 @@ function createWindow() {
 electron_1.app.whenReady().then(() => {
     (0, db_1.initDatabase)();
     createWindow();
-    (0, ipc_1.registerIpcHandlers)(mainWindow);
+    if (mainWindow) {
+        (0, ipc_1.registerIpcHandlers)(mainWindow);
+    }
 });
 electron_1.app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
+    if (process.platform !== "darwin")
         electron_1.app.quit();
-    }
 });
