@@ -8,7 +8,7 @@
     "rebuild": "cd backend && npx electron-rebuild",
     "setup": "npm run install:all && npm run rebuild",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && npm run build && electron .",
+    "dev:backend": "cd backend && npm run build && npx electron .",
     "dev": "concurrently -k -n FE,BE -c cyan,green \"npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:backend\"",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
