@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import { EditorContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { TextStyle } from "@tiptap/extension-text-style"
@@ -7,17 +8,20 @@ import Placeholder from "@tiptap/extension-placeholder"
 import { createLowlight } from "lowlight"
 
 interface Props {
+  noteId: string
   content: any
-  onChange: (json: any) => void
+  onSave: (json: any) => void
 }
 
 const lowlight = createLowlight()
 
-export default function RichEditor({ content, onChange }: Props) {
+export default function RichEditor({ noteId, content, onSave }: Props) {
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        bulletList:  { keepMarks: true },
+        bulletList: { keepMarks: true },
         orderedList: { keepMarks: true },
         codeBlock: false,
       }),
@@ -31,23 +35,48 @@ export default function RichEditor({ content, onChange }: Props) {
     ],
 
     content,
-    onUpdate: ({ editor }) => onChange(editor.getJSON()),
+    onUpdate: ({ editor }) => {
+      // Debounced auto-save (500ms)
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(() => {
+        onSave(editor.getJSON())
+      }, 500)
+    },
 
     editorProps: {
       attributes: {
-        class: "focus:outline-none w-full min-h-[calc(100vh-300px)] max-w-none",
+        class: "focus:outline-none w-full min-h-full max-w-none",
       },
     },
   })
 
+  // When noteId changes, reload content into editor
+  useEffect(() => {
+    if (editor && content) {
+      // Prevent re-setting if content is the same (avoids cursor jump)
+      const current = JSON.stringify(editor.getJSON())
+      const incoming = JSON.stringify(content)
+      if (current !== incoming) {
+        editor.commands.setContent(content)
+      }
+    }
+  }, [noteId])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
+
   if (!editor) return null
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full h-full">
 
       {/* ═══════════════ TOOLBAR ═══════════════ */}
       <div
-        className="flex flex-wrap items-center gap-1 sticky top-0 z-10"
+        className="flex flex-wrap items-center gap-1 sticky top-0 z-10 flex-shrink-0"
         style={{
           padding: "8px 12px",
           background: "rgba(6,8,17,0.75)",
@@ -142,6 +171,7 @@ export default function RichEditor({ content, onChange }: Props) {
 
       {/* ═══════════════ EDITOR AREA ═══════════════ */}
       <div
+        className="flex-1 overflow-auto"
         style={{
           background: "rgba(255,255,255,0.02)",
           border: "1px solid var(--glass-border)",
@@ -150,7 +180,6 @@ export default function RichEditor({ content, onChange }: Props) {
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
           padding: "32px 40px 60px",
-          minHeight: "calc(100vh - 320px)",
         }}
       >
         <EditorContent editor={editor} className="tiptap w-full" />

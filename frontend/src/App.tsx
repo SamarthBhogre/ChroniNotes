@@ -37,8 +37,8 @@ export default function App() {
 
       {/* ── Main content ── */}
       <main
-        className="relative z-10 flex-1 overflow-auto"
-        style={{ minWidth: 0, marginTop: "40px" }}
+        className="relative z-10 flex-1 flex flex-col"
+        style={{ minWidth: 0, marginTop: "40px", overflow: "hidden" }}
       >
         {/* Subtle top-edge glow line */}
         <div
@@ -49,7 +49,7 @@ export default function App() {
           }}
         />
 
-        <div key={page} className="page-enter min-h-full">
+        <div key={page} className="page-enter h-full" style={{ overflow: page === "notes" ? "hidden" : "auto" }}>
           {page === "dashboard" && <Dashboard onNavigate={setPage} />}
           {page === "tasks"     && <Tasks />}
           {page === "notes"     && <Notes />}

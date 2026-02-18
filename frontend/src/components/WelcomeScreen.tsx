@@ -2,16 +2,17 @@ import { useState, useEffect, useCallback, useRef } from "react"
 
 /* ─────────────────────────────────────────────
    Windows 11 OOBE-style welcome screen
-   Total time: ~3 seconds
+   Total time: ~5.5 seconds
 ───────────────────────────────────────────── */
 
 const PHASES: { text: string; sub?: string; duration: number }[] = [
-  { text: "Hi",                                                            duration: 900  },
-  { text: "Welcome to ChorniNotes", sub: "Your personal productivity space", duration: 1000 },
-  { text: "Let's go",                                                      duration: 700  },
+  { text: "Hi",                                                             duration: 1400 },
+  { text: "Welcome to ChorniNotes", sub: "Your personal productivity space", duration: 2000 },
+  { text: "Setting things up…",                                             duration: 1200 },
+  { text: "Let's go ✦",                                                     duration: 900  },
 ]
 
-const TOTAL_DURATION = PHASES.reduce((s, p) => s + p.duration, 0) // ~2600ms + delays
+const TOTAL_DURATION = PHASES.reduce((s, p) => s + p.duration, 0)
 
 interface Props {
   onFinished: () => void
@@ -32,8 +33,8 @@ export default function WelcomeScreen({ onFinished }: Props) {
     const tick = (now: number) => {
       const elapsed = now - startTime.current
       const t = Math.min(elapsed / TOTAL_DURATION, 1)
-      // Ease-out curve for smooth deceleration
-      const eased = 1 - Math.pow(1 - t, 2.5)
+      // Smooth ease-out curve with gentle deceleration
+      const eased = 1 - Math.pow(1 - t, 3)
       setProgress(eased * 100)
 
       if (t < 1) {
@@ -52,7 +53,7 @@ export default function WelcomeScreen({ onFinished }: Props) {
       if (next >= PHASES.length) {
         setProgress(100)
         setExiting(true)
-        setTimeout(onFinished, 500)
+        setTimeout(onFinished, 700)
         return prev
       }
       return next
@@ -61,7 +62,7 @@ export default function WelcomeScreen({ onFinished }: Props) {
 
   /* Kick off after mount */
   useEffect(() => {
-    const t = setTimeout(() => setPhase(0), 200)
+    const t = setTimeout(() => setPhase(0), 350)
     return () => clearTimeout(t)
   }, [])
 
@@ -71,7 +72,7 @@ export default function WelcomeScreen({ onFinished }: Props) {
 
     setFadeClass("ws-fade-in")
 
-    const fadeOutDelay = PHASES[phase].duration - 300
+    const fadeOutDelay = PHASES[phase].duration - 450
     const fadeOutTimer = setTimeout(() => setFadeClass("ws-fade-out"), fadeOutDelay)
     const nextTimer = setTimeout(advance, PHASES[phase].duration)
 
@@ -99,18 +100,18 @@ export default function WelcomeScreen({ onFinished }: Props) {
 
       {/* Floating particles */}
       <div className="ws-particles">
-        {Array.from({ length: 20 }).map((_, i) => (
+        {Array.from({ length: 24 }).map((_, i) => (
           <div
             key={i}
             className="ws-particle"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 8}s`,
-              animationDuration: `${6 + Math.random() * 8}s`,
+              animationDelay: `${Math.random() * 10}s`,
+              animationDuration: `${8 + Math.random() * 10}s`,
               width: `${2 + Math.random() * 3}px`,
               height: `${2 + Math.random() * 3}px`,
-              opacity: 0.15 + Math.random() * 0.25,
+              opacity: 0.12 + Math.random() * 0.2,
             }}
           />
         ))}
@@ -145,12 +146,12 @@ export default function WelcomeScreen({ onFinished }: Props) {
           </div>
         )}
 
-        {/* Loading dots — only on middle phase */}
-        {phase === 1 && (
+        {/* Loading dots — on middle phases (1 and 2) */}
+        {(phase === 1 || phase === 2) && (
           <div className={`ws-dots ${fadeClass}`}>
             <span className="ws-dot" style={{ animationDelay: "0s" }} />
-            <span className="ws-dot" style={{ animationDelay: "0.15s" }} />
-            <span className="ws-dot" style={{ animationDelay: "0.3s" }} />
+            <span className="ws-dot" style={{ animationDelay: "0.18s" }} />
+            <span className="ws-dot" style={{ animationDelay: "0.36s" }} />
           </div>
         )}
 
@@ -184,13 +185,15 @@ const welcomeStyles = `
   justify-content: center;
   background: #040608;
   overflow: hidden;
-  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+              filter 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ws-exit {
   opacity: 0;
-  transform: scale(1.04);
+  transform: scale(1.06);
+  filter: blur(6px);
   pointer-events: none;
 }
 
@@ -203,42 +206,49 @@ const welcomeStyles = `
 .ws-gradient {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100px);
-  animation: wsGradientDrift 12s ease-in-out infinite alternate;
+  filter: blur(120px);
+  animation: wsGradientDrift 16s ease-in-out infinite alternate;
 }
 
 .ws-gradient-1 {
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.25), transparent 70%);
+  width: 650px; height: 650px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.28), transparent 70%);
   top: -15%; left: -10%;
   animation-delay: 0s;
 }
 .ws-gradient-2 {
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.20), transparent 70%);
+  width: 550px; height: 550px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.22), transparent 70%);
   bottom: -15%; right: -5%;
-  animation-delay: -4s;
+  animation-delay: -5s;
 }
 .ws-gradient-3 {
-  width: 350px; height: 350px;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.15), transparent 70%);
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.16), transparent 70%);
   top: 50%; left: 55%;
   transform: translate(-50%, -50%);
-  animation-delay: -8s;
+  animation-delay: -10s;
 }
 
 @keyframes wsGradientDrift {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(40px, 30px) scale(1.1); }
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(20px, 15px) scale(1.05); }
+  100% { transform: translate(40px, 30px) scale(1.12); }
 }
 
 .ws-spotlight {
   position: absolute;
   top: 50%; left: 50%;
-  width: 800px; height: 800px;
+  width: 900px; height: 900px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.06) 0%, transparent 60%);
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.07) 0%, transparent 60%);
   pointer-events: none;
+  animation: wsSpotlightPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes wsSpotlightPulse {
+  0%   { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 1;   transform: translate(-50%, -50%) scale(1.08); }
 }
 
 .ws-particles {
@@ -255,10 +265,10 @@ const welcomeStyles = `
 }
 
 @keyframes wsParticleFloat {
-  0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(-120px) translateX(30px) scale(0.5); opacity: 0; }
+  0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translateY(-140px) translateX(35px) scale(0.4); opacity: 0; }
 }
 
 .ws-center {
@@ -267,32 +277,35 @@ const welcomeStyles = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 28px;
+  gap: 32px;
 }
+
+/* ── Logo ── */
 
 .ws-logo {
   position: relative;
-  width: 80px; height: 80px;
+  width: 84px; height: 84px;
   opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: scale(0.5) translateY(12px);
+  transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .ws-logo-visible {
   opacity: 1;
-  transform: scale(1);
+  transform: scale(1) translateY(0);
 }
 
 .ws-logo-ring {
   position: absolute;
-  inset: -6px;
+  inset: -8px;
   border-radius: 50%;
-  border: 2px solid rgba(129, 140, 248, 0.3);
-  animation: wsRingPulse 2s ease-in-out infinite;
+  border: 2px solid rgba(129, 140, 248, 0.25);
+  animation: wsRingPulse 2.5s ease-in-out infinite;
 }
 
 @keyframes wsRingPulse {
-  0%, 100% { transform: scale(1); opacity: 0.4; border-color: rgba(129, 140, 248, 0.3); }
-  50% { transform: scale(1.08); opacity: 0.8; border-color: rgba(129, 140, 248, 0.6); }
+  0%, 100% { transform: scale(1);    opacity: 0.3; border-color: rgba(129, 140, 248, 0.25); }
+  50%      { transform: scale(1.1);  opacity: 0.7; border-color: rgba(129, 140, 248, 0.55); }
 }
 
 .ws-logo-inner {
@@ -304,28 +317,30 @@ const welcomeStyles = `
   justify-content: center;
   box-shadow: 0 8px 40px rgba(99, 102, 241, 0.4),
               0 0 80px rgba(99, 102, 241, 0.15);
-  animation: wsLogoGlow 3s ease-in-out infinite alternate;
+  animation: wsLogoGlow 4s ease-in-out infinite alternate;
 }
 
 @keyframes wsLogoGlow {
-  0% { box-shadow: 0 8px 40px rgba(99, 102, 241, 0.35), 0 0 60px rgba(99, 102, 241, 0.1); }
-  100% { box-shadow: 0 8px 50px rgba(99, 102, 241, 0.5), 0 0 100px rgba(99, 102, 241, 0.2); }
+  0%   { box-shadow: 0 8px 40px rgba(99, 102, 241, 0.3),  0 0 60px rgba(99, 102, 241, 0.08); }
+  100% { box-shadow: 0 10px 55px rgba(99, 102, 241, 0.5), 0 0 110px rgba(99, 102, 241, 0.2); }
 }
 
 .ws-logo-letter {
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 700;
   color: white;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   font-family: 'Inter', sans-serif;
 }
+
+/* ── Text ── */
 
 .ws-text-block {
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .ws-heading {
@@ -339,31 +354,35 @@ const welcomeStyles = `
 
 .ws-subtext {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.42);
   font-weight: 400;
   letter-spacing: 0.3px;
   margin: 0;
 }
 
+/* ── Fade transitions (smoother & longer) ── */
+
 .ws-fade-in {
-  animation: wsFadeIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: wsFadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 .ws-fade-out {
-  animation: wsFadeOut 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: wsFadeOut 0.4s cubic-bezier(0.4, 0, 0.6, 1) forwards;
 }
 
 @keyframes wsFadeIn {
-  from { opacity: 0; transform: translateY(16px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(20px) scale(0.96); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0) scale(1);       filter: blur(0px); }
 }
 @keyframes wsFadeOut {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to   { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  from { opacity: 1; transform: translateY(0) scale(1);        filter: blur(0px); }
+  to   { opacity: 0; transform: translateY(-16px) scale(0.96); filter: blur(4px); }
 }
+
+/* ── Loading dots ── */
 
 .ws-dots {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   margin-top: -8px;
 }
 
@@ -371,27 +390,28 @@ const welcomeStyles = `
   width: 7px; height: 7px;
   border-radius: 50%;
   background: rgba(129, 140, 248, 0.8);
-  animation: wsDotBounce 1s ease-in-out infinite;
+  animation: wsDotBounce 1.2s ease-in-out infinite;
 }
 
 @keyframes wsDotBounce {
   0%, 80%, 100% {
-    transform: scale(0.6);
-    opacity: 0.3;
+    transform: scale(0.5) translateY(0);
+    opacity: 0.25;
   }
   40% {
-    transform: scale(1.2);
+    transform: scale(1.3) translateY(-4px);
     opacity: 1;
-    box-shadow: 0 0 12px rgba(129, 140, 248, 0.6);
+    box-shadow: 0 0 14px rgba(129, 140, 248, 0.6);
   }
 }
 
 /* ── Smooth progress bar ── */
+
 .ws-progress-track {
-  width: 200px;
+  width: 220px;
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
   margin-top: 4px;
 }
@@ -400,9 +420,8 @@ const welcomeStyles = `
   height: 100%;
   border-radius: 2px;
   background: linear-gradient(90deg, #6366f1, #818cf8, #8b5cf6);
-  box-shadow: 0 0 12px rgba(129, 140, 248, 0.4);
+  box-shadow: 0 0 14px rgba(129, 140, 248, 0.45);
   position: relative;
-  /* No CSS transition — driven by rAF for buttery smoothness */
   will-change: width;
 }
 
@@ -413,10 +432,10 @@ const welcomeStyles = `
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0.4) 50%,
     transparent 100%
   );
-  animation: wsShimmer 1.2s ease-in-out infinite;
+  animation: wsShimmer 1.6s ease-in-out infinite;
 }
 
 @keyframes wsShimmer {

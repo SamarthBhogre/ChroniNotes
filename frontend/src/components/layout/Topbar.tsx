@@ -128,9 +128,12 @@ export default function Topbar({ title = "ChorniNotes" }: TopbarProps) {
                   <span>⚙️</span>
                   Settings
                 </MenuItem>
-                <MenuItem onClick={() => setShowMenu(false)}>
+                <MenuItem onClick={() => {
+                  setShowMenu(false)
+                  window.electron?.invoke("notes:openFolder")
+                }}>
                   <span>📁</span>
-                  Open Folder
+                  Open Notes Folder
                 </MenuItem>
                 <MenuItem onClick={() => setShowMenu(false)}>
                   <span>📊</span>
