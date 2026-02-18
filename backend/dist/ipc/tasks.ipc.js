@@ -6,7 +6,7 @@ const db_1 = require("../db");
 function registerTaskHandlers() {
     const db = (0, db_1.getDb)();
     electron_1.ipcMain.handle("tasks:create", (_, title) => {
-        const stmt = db.prepare("INSERT INTO tasks (title, status) VALUES (?, 'todo')");
+        const stmt = db.prepare("INSERT INTO tasks (title) VALUES (?)");
         const result = stmt.run(title);
         return {
             id: result.lastInsertRowid,
@@ -16,7 +16,7 @@ function registerTaskHandlers() {
     });
     electron_1.ipcMain.handle("tasks:list", () => {
         return db
-            .prepare("SELECT * FROM tasks ORDER BY id DESC")
+            .prepare("SELECT * FROM tasks ORDER BY created_at DESC")
             .all();
     });
     electron_1.ipcMain.handle("tasks:updateStatus", (_, { id, status }) => {

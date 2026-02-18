@@ -23,7 +23,6 @@ export const useTasksStore = create<TasksStore>((set) => ({
     const data = await window.electron.invoke("tasks:list")
     set({ tasks: data })
     console.log("[ZUSTAND] loadTasks executed")
-
   },
 
   createTask: async (title) => {
@@ -32,7 +31,6 @@ export const useTasksStore = create<TasksStore>((set) => ({
     const data = await window.electron.invoke("tasks:list")
     set({ tasks: data })
     console.log("[ZUSTAND] createTask executed")
-
   },
 
   updateStatus: async (id, status) => {
@@ -43,14 +41,12 @@ export const useTasksStore = create<TasksStore>((set) => ({
     const data = await window.electron.invoke("tasks:list")
     set({ tasks: data })
     console.log("[ZUSTAND] updateStatus executed")
-
   },
 
   deleteTask: async (id) => {
-    await window.electron.invoke("tasks:delete", { id })
+    await window.electron.invoke("tasks:delete", id) // ✅ Fixed: send id directly, not { id }
     const data = await window.electron.invoke("tasks:list")
     set({ tasks: data })
     console.log("[ZUSTAND] deleteTask executed")
-
   },
 }))

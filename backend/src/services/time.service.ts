@@ -3,9 +3,14 @@ import { getDb } from "../db"
 
 /* ---------------- INTERNAL STATE ---------------- */
 
-let timer: NodeJS.Timeout | null = null
-let seconds = 0
-let mode: "work" | "break" = "work"
+let pomodoroTimer: NodeJS.Timeout | null = null
+let pomodoroSeconds = 0
+let pomodoroMode: "work" | "break" = "work"
+let pomodoroPaused = false          // ← NEW
+
+let stopwatchTimer: NodeJS.Timeout | null = null
+let stopwatchSeconds = 0
+let stopwatchPaused = false         // ← NEW
 
 /* ---------------- TYPES ---------------- */
 
@@ -18,27 +23,26 @@ type PomodoroSettingsRow = {
 
 export function getSettings() {
   const db = getDb()
-
   const row = db
-    .prepare(
-      "SELECT work_minutes, break_minutes FROM pomodoro_settings LIMIT 1"
-    )
+    .prepare("SELECT work_minutes, break_minutes FROM pomodoro_settings LIMIT 1")
     .get() as PomodoroSettingsRow | undefined
 
   return {
-    workMinutes: row?.work_minutes ?? 25,
+    workMinutes:  row?.work_minutes  ?? 25,
     breakMinutes: row?.break_minutes ?? 5,
   }
 }
 
-export function updateSettings(
-  workMinutes: number,
-  breakMinutes: number
-) {
+export function updateSettings(workMinutes: number, breakMinutes: number) {
   const db = getDb()
 
-  const work = Math.max(1, workMinutes)
-  const brk = Math.max(1, breakMinutes)
+  const work = Math.max(1, Math.floor(Number(workMinutes) || 25))
+  const brk  = Math.max(1, Math.floor(Number(breakMinutes) || 5))
+
+  if (isNaN(work) || isNaN(brk)) {
+    console.error("Invalid settings received:", { workMinutes, breakMinutes })
+    throw new Error("Timer settings must be valid numbers")
+  }
 
   db.prepare("DELETE FROM pomodoro_settings").run()
   db.prepare(
@@ -46,37 +50,110 @@ export function updateSettings(
   ).run(work, brk)
 }
 
-/* ---------------- TIMER LOGIC ---------------- */
+/* ---------------- POMODORO ---------------- */
 
 export function startPomodoro(window?: BrowserWindow) {
-  if (timer) return
+  // Resume from pause — just restart the interval, keep seconds
+  if (pomodoroPaused && !pomodoroTimer) {
+    pomodoroPaused = false
+    pomodoroTimer = createPomodoroInterval(window)
+    return
+  }
 
+  // Already running — do nothing
+  if (pomodoroTimer) return
+
+  // Fresh start
+  const settings = getSettings()
+  pomodoroMode    = "work"
+  pomodoroSeconds = settings.workMinutes * 60
+  pomodoroPaused  = false
+  pomodoroTimer   = createPomodoroInterval(window)
+}
+
+function createPomodoroInterval(window?: BrowserWindow): NodeJS.Timeout {
   const settings = getSettings()
 
-  mode = "work"
-  seconds = settings.workMinutes * 60
-
-  timer = setInterval(() => {
-    seconds--
+  return setInterval(() => {
+    pomodoroSeconds--
 
     window?.webContents.send("timer:update", {
-      seconds,
-      mode,
+      seconds: pomodoroSeconds,
+      mode:    pomodoroMode,
     })
 
-    if (seconds <= 0) {
-      mode = mode === "work" ? "break" : "work"
-      seconds =
-        (mode === "work"
-          ? settings.workMinutes
-          : settings.breakMinutes) * 60
+    if (pomodoroSeconds <= 0) {
+      pomodoroMode    = pomodoroMode === "work" ? "break" : "work"
+      pomodoroSeconds = (pomodoroMode === "work"
+        ? settings.workMinutes
+        : settings.breakMinutes) * 60
     }
   }, 1000)
 }
 
-export function stopPomodoro() {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
+export function pausePomodoro() {
+  if (pomodoroTimer) {
+    clearInterval(pomodoroTimer)
+    pomodoroTimer  = null
+    pomodoroPaused = true   // remember we are paused, not stopped
   }
+}
+
+export function stopPomodoro() {
+  if (pomodoroTimer) {
+    clearInterval(pomodoroTimer)
+    pomodoroTimer = null
+  }
+  // Full reset
+  pomodoroSeconds = 0
+  pomodoroMode    = "work"
+  pomodoroPaused  = false
+}
+
+/* ---------------- STOPWATCH ---------------- */
+
+export function startStopwatch(window?: BrowserWindow) {
+  // Resume from pause — keep elapsed seconds
+  if (stopwatchPaused && !stopwatchTimer) {
+    stopwatchPaused = false
+    stopwatchTimer  = createStopwatchInterval(window)
+    return
+  }
+
+  // Already running — do nothing
+  if (stopwatchTimer) return
+
+  // Fresh start
+  stopwatchSeconds = 0
+  stopwatchPaused  = false
+  stopwatchTimer   = createStopwatchInterval(window)
+}
+
+function createStopwatchInterval(window?: BrowserWindow): NodeJS.Timeout {
+  return setInterval(() => {
+    stopwatchSeconds++
+
+    window?.webContents.send("timer:update", {
+      seconds: stopwatchSeconds,
+      mode:    "stopwatch" as any,
+    })
+  }, 1000)
+}
+
+export function pauseStopwatch() {
+  if (stopwatchTimer) {
+    clearInterval(stopwatchTimer)
+    stopwatchTimer  = null
+    stopwatchPaused = true  // remember we are paused, not stopped
+  }
+}
+
+export function stopStopwatch() {
+  if (stopwatchTimer) {
+    clearInterval(stopwatchTimer)
+    stopwatchTimer = null
+  }
+  // Full reset
+  stopwatchSeconds = 0
+  stopwatchPaused  = false
 }

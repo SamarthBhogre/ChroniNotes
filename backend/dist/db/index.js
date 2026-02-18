@@ -17,6 +17,13 @@ function initDatabase() {
 }
 function createSchema() {
     db.exec(`
+  CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'todo',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS pomodoro_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     work_minutes INTEGER NOT NULL,
