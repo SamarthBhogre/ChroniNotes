@@ -1,7 +1,25 @@
 {
+  "name": "chroninotes",
+  "version": "1.0.0",
+  "description": "Offline-first desktop productivity assistant for students",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "rebuild": "cd backend && npx electron-rebuild",
+    "setup": "npm run install:all && npm run rebuild",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run build && electron .",
+    "dev": "concurrently -k -n FE,BE -c cyan,green \"npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:backend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "build": "npm run build:backend && npm run build:frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "wait-on": "^8.0.5"
+  },
   "dependencies": {
     "framer-motion": "^12.33.0",
-    "lucide-react": "^0.563.0",
-    "pi": "^2.0.5"
+    "lucide-react": "^0.563.0"
   }
 }

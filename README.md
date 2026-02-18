@@ -17,58 +17,48 @@ Make sure you have the following installed:
 - **[Git](https://git-scm.com/)**
 - **npm** (comes with Node.js)
 
-### Installation
+### Installation & Setup (one command)
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/SamarthBhogre/ChroniNotes.git
 cd ChroniNotes
 
-# 2. Install backend dependencies
-cd backend
-npm install
-
-# 3. Install frontend dependencies
-cd ../frontend
-npm install
+# 2. Install everything + rebuild native modules
+npm run setup
 ```
 
-### Rebuild Native Modules
+This single command installs dependencies for root, backend, and frontend, then rebuilds `better-sqlite3` for Electron.
 
-The app uses `better-sqlite3`, which requires a native rebuild for Electron:
-
-```bash
-cd backend
-npx electron-rebuild
-```
-
-> **Windows users**: You may need the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload installed.
+> **Windows users**: You may need the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload installed for the native rebuild step.
 
 ---
 
 ## ▶️ Running the App
 
-You need **two terminals** — one for the frontend dev server and one for Electron.
-
-**Terminal 1 — Start the frontend:**
-
 ```bash
-cd frontend
 npm run dev
 ```
 
-This starts the Vite dev server at `http://localhost:5173`.
+That's it. This single command:
+1. Starts the Vite frontend dev server
+2. Waits for it to be ready at `http://localhost:5173`
+3. Compiles the backend TypeScript
+4. Launches the Electron window
 
-**Terminal 2 — Build & launch Electron:**
+Both processes run side-by-side and are killed together when you press `Ctrl+C`.
 
-```bash
-cd backend
-npm run start
-```
+### Other scripts
 
-This compiles TypeScript and launches the Electron window.
-
-> **Tip:** During development, you can run `npm run dev` in the backend folder to watch for TypeScript changes, and use `npx electron .` separately to launch.
+| Command | What it does |
+|---------|-------------|
+| `npm run dev` | Start the full app (frontend + Electron) |
+| `npm run setup` | Install all deps + rebuild native modules |
+| `npm run build` | Production build (backend + frontend) |
+| `npm run dev:frontend` | Start only the Vite dev server |
+| `npm run dev:backend` | Build + launch only Electron |
+| `npm run install:all` | Install deps for root, backend, and frontend |
+| `npm run rebuild` | Rebuild native modules for Electron |
 
 ---
 
