@@ -1,0 +1,52 @@
+{
+  appId: "com.chroninotes.app",
+  productName: "ChorniNotes",
+  directories: {
+    buildResources: "assets",
+    output: "dist"
+  },
+  files: [
+    "!node_modules",
+    "!backend/node_modules",
+    "!frontend",
+    "!.git"
+  ],
+  extraFiles: [
+    {
+      from: "../backend/dist",
+      to: "backend/dist"
+    },
+    {
+      from: "../frontend/dist",
+      to: "frontend/dist"
+    }
+  ],
+  extraMetadata: {
+    main: "backend/dist/main.js"
+  },
+  asarUnpack: ["**/*.node"],
+  asar: false,
+  win: {
+    target: [
+      {
+        target: "nsis",
+        arch: ["x64"]
+      },
+      {
+        target: "portable",
+        arch: ["x64"]
+      }
+    ],
+    icon: "assets/icon.ico"
+  },
+  nsis: {
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: "ChorniNotes"
+  },
+  portable: {
+    artifactName: "${productName}-${version}-portable.exe"
+  }
+}

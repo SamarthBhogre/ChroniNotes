@@ -12,14 +12,61 @@
     "dev": "concurrently -k -n FE,BE -c cyan,green \"npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:backend\"",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
-    "build": "npm run build:backend && npm run build:frontend"
+    "build": "npm run build:backend && npm run build:frontend",
+    "dist": "npm run build && cd backend && npm run dist"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
+    "electron-icon-maker": "^0.0.5",
+    "icojs": "^0.20.1",
+    "png2ico": "^0.4.1",
+    "sharp": "^0.34.5",
     "wait-on": "^8.0.5"
   },
   "dependencies": {
     "framer-motion": "^12.33.0",
     "lucide-react": "^0.563.0"
+  },
+  "build": {
+    "appId": "com.chroninotes.app",
+    "productName": "ChorniNotes",
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "files": [
+      "backend/dist/**/*",
+      "backend/package.json",
+      "backend/node_modules/**/*",
+      "frontend/dist/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ChorniNotes"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    }
   }
 }
