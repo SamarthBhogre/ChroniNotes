@@ -11,12 +11,3 @@ build/
 # Logs
 npm-debug.log*
 yarn-debug.log*
-
-# Build artifacts
-backend/dist-output/
-dist/
-*.exe
-*.dmg
-*.AppImage
-*.deb
-*.rpm
