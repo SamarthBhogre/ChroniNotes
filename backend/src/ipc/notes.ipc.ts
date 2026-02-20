@@ -127,7 +127,7 @@ function scanDir(dir: string, root: string): NoteEntry[] {
         id,
         name: meta.title || item.name,
         title: meta.title || item.name,
-        icon: meta.icon || "📁",
+        icon: meta.icon || "◈",
         isFolder: true,
         parentId: parentId(id),
         content: null,
@@ -145,7 +145,7 @@ function scanDir(dir: string, root: string): NoteEntry[] {
           id,
           name: data.title || item.name.replace(NOTE_EXT, ""),
           title: data.title || item.name.replace(NOTE_EXT, ""),
-          icon: data.icon || "📄",
+          icon: data.icon || "◉",
           isFolder: false,
           parentId: parentId(id),
           content: null, // don't send content in list
@@ -190,7 +190,7 @@ export function registerNotesHandlers() {
         id,
         name: meta.title || path.basename(absPath),
         title: meta.title || path.basename(absPath),
-        icon: meta.icon || "📁",
+        icon: meta.icon || "◈",
         isFolder: true,
         parentId: parentId(id),
         content: null,
@@ -205,7 +205,7 @@ export function registerNotesHandlers() {
       id,
       name: data.title,
       title: data.title,
-      icon: data.icon || "📄",
+      icon: data.icon || "◉",
       isFolder: false,
       parentId: parentId(id),
       content: data.content,
@@ -233,7 +233,7 @@ export function registerNotesHandlers() {
 
       const noteData: NoteFile = {
         title,
-        icon: payload.icon || "📄",
+        icon: payload.icon || "◉",
         content: { type: "doc", content: [] },
         createdAt: now,
         updatedAt: now,
@@ -276,7 +276,7 @@ export function registerNotesHandlers() {
       const now = new Date().toISOString()
       const meta: NoteFile = {
         title,
-        icon: payload.icon || "📁",
+        icon: payload.icon || "◈",
         content: null,
         createdAt: now,
         updatedAt: now,
@@ -324,7 +324,7 @@ export function registerNotesHandlers() {
           id: payload.id,
           name: meta.title,
           title: meta.title,
-          icon: meta.icon || "📁",
+          icon: meta.icon || "◈",
           isFolder: true,
           parentId: parentId(payload.id),
           content: null,

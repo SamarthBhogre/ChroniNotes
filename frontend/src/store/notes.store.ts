@@ -72,7 +72,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     const entry: NoteEntry = await window.electron.invoke("notes:create", {
       parentId,
       title: "Untitled",
-      icon: "📄",
+      icon: "◉",
     })
 
     set(s => {
@@ -92,7 +92,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     const entry: NoteEntry = await window.electron.invoke("notes:createFolder", {
       parentId,
       title: "New Folder",
-      icon: "📁",
+      icon: "◈",
     })
 
     set(s => {

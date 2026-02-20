@@ -144,7 +144,7 @@ export default function Notes() {
           <div className="flex-1 flex items-center justify-center">
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "48px", marginBottom: "16px", opacity: 0.3 }}>
-                {activeNote.icon}
+                ◈
               </div>
               <h2
                 style={{
@@ -185,7 +185,7 @@ export default function Notes() {
                   e.currentTarget.style.boxShadow = "none"
                 }}
               >
-                ＋ New page here
+                + New page here
               </button>
             </div>
           </div>

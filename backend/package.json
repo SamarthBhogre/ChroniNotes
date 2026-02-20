@@ -14,12 +14,14 @@
   "type": "commonjs",
   "dependencies": {
     "better-sqlite3": "^12.5.0",
-    "electron": "^39.2.7"
+    "electron": "^39.2.7",
+    "node-notifier": "^10.0.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/electron": "^1.4.38",
     "@types/node": "^25.0.3",
+    "@types/node-notifier": "^8.0.5",
     "electron-rebuild": "^3.2.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

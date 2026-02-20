@@ -138,9 +138,9 @@ export default function Timer() {
 
   const statusText = isRunning
     ? tool === "pomodoro"
-      ? mode === "work" ? "🧠 Focus session active" : "☕ Break time!"
-      : "⏱ Stopwatch running"
-    : isPaused ? "⏸ Paused"
+      ? mode === "work" ? "Focus session active" : "Break time active"
+      : "Stopwatch running"
+    : isPaused ? "Session paused"
     : "Ready to start"
 
   /* Progress 0→1 for ring arc */

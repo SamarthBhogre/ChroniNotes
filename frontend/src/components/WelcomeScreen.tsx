@@ -90,32 +90,24 @@ export default function WelcomeScreen({ onFinished }: Props) {
     <div className={`ws-container ${exiting ? "ws-exit" : ""}`}>
       {/* Animated gradient background */}
       <div className="ws-bg">
-        <div className="ws-gradient ws-gradient-1" />
-        <div className="ws-gradient ws-gradient-2" />
-        <div className="ws-gradient ws-gradient-3" />
+        <div 
+          className="ws-gradient ws-gradient-1"
+          style={{ transform: `translate(${progress * 0.4}px, ${progress * 0.3}px) scale(${1 + progress * 0.0012})` }}
+        />
+        <div 
+          className="ws-gradient ws-gradient-2"
+          style={{ transform: `translate(${progress * 0.4}px, ${progress * 0.3}px) scale(${1 + progress * 0.0012})` }}
+        />
+        <div 
+          className="ws-gradient ws-gradient-3"
+          style={{ transform: `translate(${progress * 0.4}px, ${progress * 0.3}px) scale(${1 + progress * 0.0012})` }}
+        />
       </div>
 
       {/* Subtle radial spotlight */}
       <div className="ws-spotlight" />
 
-      {/* Floating particles */}
-      <div className="ws-particles">
-        {Array.from({ length: 24 }).map((_, i) => (
-          <div
-            key={i}
-            className="ws-particle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 10}s`,
-              animationDuration: `${8 + Math.random() * 10}s`,
-              width: `${2 + Math.random() * 3}px`,
-              height: `${2 + Math.random() * 3}px`,
-              opacity: 0.12 + Math.random() * 0.2,
-            }}
-          />
-        ))}
-      </div>
+      {/* Floating particles - disabled */}
 
       {/* Center content */}
       <div className="ws-center">
@@ -207,33 +199,33 @@ const welcomeStyles = `
   position: absolute;
   border-radius: 50%;
   filter: blur(120px);
-  animation: wsGradientDrift 16s ease-in-out infinite alternate;
-}
-
-.ws-gradient-1 {
-  width: 650px; height: 650px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.28), transparent 70%);
-  top: -15%; left: -10%;
-  animation-delay: 0s;
-}
-.ws-gradient-2 {
-  width: 550px; height: 550px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.22), transparent 70%);
-  bottom: -15%; right: -5%;
-  animation-delay: -5s;
-}
-.ws-gradient-3 {
-  width: 380px; height: 380px;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.16), transparent 70%);
-  top: 50%; left: 55%;
-  transform: translate(-50%, -50%);
-  animation-delay: -10s;
+  animation: wsGradientDrift 30s ease-in-out infinite alternate;
 }
 
 @keyframes wsGradientDrift {
   0%   { transform: translate(0, 0) scale(1); }
   50%  { transform: translate(20px, 15px) scale(1.05); }
   100% { transform: translate(40px, 30px) scale(1.12); }
+}
+
+.ws-gradient-1 {
+  width: 650px; height: 650px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.35), transparent 70%);
+  top: -15%; left: -10%;
+  animation-delay: 0s;
+}
+.ws-gradient-2 {
+  width: 550px; height: 550px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.30), transparent 70%);
+  bottom: -15%; right: -5%;
+  animation-delay: 0s;
+}
+.ws-gradient-3 {
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.25), transparent 70%);
+  top: 50%; left: 55%;
+  transform: translate(-50%, -50%);
+  animation-delay: 0s;
 }
 
 .ws-spotlight {
@@ -243,12 +235,6 @@ const welcomeStyles = `
   transform: translate(-50%, -50%);
   background: radial-gradient(circle, rgba(129, 140, 248, 0.07) 0%, transparent 60%);
   pointer-events: none;
-  animation: wsSpotlightPulse 4s ease-in-out infinite alternate;
-}
-
-@keyframes wsSpotlightPulse {
-  0%   { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 1;   transform: translate(-50%, -50%) scale(1.08); }
 }
 
 .ws-particles {
@@ -261,14 +247,6 @@ const welcomeStyles = `
   position: absolute;
   border-radius: 50%;
   background: rgba(129, 140, 248, 0.6);
-  animation: wsParticleFloat linear infinite;
-}
-
-@keyframes wsParticleFloat {
-  0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
-  8%   { opacity: 1; }
-  92%  { opacity: 1; }
-  100% { transform: translateY(-140px) translateX(35px) scale(0.4); opacity: 0; }
 }
 
 .ws-center {
@@ -300,12 +278,6 @@ const welcomeStyles = `
   inset: -8px;
   border-radius: 50%;
   border: 2px solid rgba(129, 140, 248, 0.25);
-  animation: wsRingPulse 2.5s ease-in-out infinite;
-}
-
-@keyframes wsRingPulse {
-  0%, 100% { transform: scale(1);    opacity: 0.3; border-color: rgba(129, 140, 248, 0.25); }
-  50%      { transform: scale(1.1);  opacity: 0.7; border-color: rgba(129, 140, 248, 0.55); }
 }
 
 .ws-logo-inner {
@@ -317,12 +289,6 @@ const welcomeStyles = `
   justify-content: center;
   box-shadow: 0 8px 40px rgba(99, 102, 241, 0.4),
               0 0 80px rgba(99, 102, 241, 0.15);
-  animation: wsLogoGlow 4s ease-in-out infinite alternate;
-}
-
-@keyframes wsLogoGlow {
-  0%   { box-shadow: 0 8px 40px rgba(99, 102, 241, 0.3),  0 0 60px rgba(99, 102, 241, 0.08); }
-  100% { box-shadow: 0 10px 55px rgba(99, 102, 241, 0.5), 0 0 110px rgba(99, 102, 241, 0.2); }
 }
 
 .ws-logo-letter {

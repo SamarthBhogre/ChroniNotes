@@ -115,7 +115,13 @@ body {
 .bg-orb {
   position: absolute; border-radius: 50%;
   filter: blur(90px);
-  animation: orbDrift 14s ease-in-out infinite alternate;
+  animation: orbDrift 56s ease-in-out infinite alternate;
+}
+
+@keyframes orbDrift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(17.5px, 12.5px) scale(1.035); }
+  100% { transform: translate(35px, 25px) scale(1.07); }
 }
 
 .bg-orb-1 {
@@ -143,8 +149,9 @@ body {
 }
 
 @keyframes orbDrift {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(35px, 25px) scale(1.07); }
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(17.5px, 12.5px) scale(1.035); }
+  100% { transform: translate(35px, 25px) scale(1.07); }
 }
 
 /* ═══════════════════════════════════

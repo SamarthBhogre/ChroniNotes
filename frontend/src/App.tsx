@@ -25,12 +25,14 @@ export default function App() {
       {/* ── Custom Topbar with window controls ── */}
       <Topbar />
 
-      {/* ── Animated background orbs ── */}
-      <div className="bg-orbs">
-        <div className="bg-orb bg-orb-1" />
-        <div className="bg-orb bg-orb-2" />
-        <div className="bg-orb bg-orb-3" />
-      </div>
+      {/* ── Animated background orbs (hidden during loading) ── */}
+      {!showWelcome && (
+        <div className="bg-orbs">
+          <div className="bg-orb bg-orb-1" />
+          <div className="bg-orb bg-orb-2" />
+          <div className="bg-orb bg-orb-3" />
+        </div>
+      )}
 
       {/* ── Sidebar ── */}
       <Sidebar current={page} onChange={setPage} />

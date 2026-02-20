@@ -125,18 +125,18 @@ export default function Topbar({ title = "ChorniNotes" }: TopbarProps) {
                 }}
               >
                 <MenuItem onClick={() => setShowMenu(false)}>
-                  <span>⚙️</span>
+                  <span>⚙</span>
                   Settings
                 </MenuItem>
                 <MenuItem onClick={() => {
                   setShowMenu(false)
                   window.electron?.invoke("notes:openFolder")
                 }}>
-                  <span>📁</span>
+                  <span>⬚</span>
                   Open Notes Folder
                 </MenuItem>
                 <MenuItem onClick={() => setShowMenu(false)}>
-                  <span>📊</span>
+                  <span>↓</span>
                   Export Data
                 </MenuItem>
                 <div
@@ -147,7 +147,7 @@ export default function Topbar({ title = "ChorniNotes" }: TopbarProps) {
                   }}
                 />
                 <MenuItem onClick={() => setShowMenu(false)}>
-                  <span>ℹ️</span>
+                  <span>ⓘ</span>
                   About
                 </MenuItem>
               </div>

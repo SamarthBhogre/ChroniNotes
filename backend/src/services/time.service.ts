@@ -1,16 +1,28 @@
 import { BrowserWindow } from "electron"
 import { getDb } from "../db"
+import {
+  notifyWorkSessionStart,
+  notifyBreakSessionStart,
+  notifyBreakEnded,
+  notifyTimerPaused,
+  notifyTimerStopped,
+  notifyStopwatchStart,
+} from "./notification.service"
 
 /* ---------------- INTERNAL STATE ---------------- */
 
 let pomodoroTimer: NodeJS.Timeout | null = null
 let pomodoroSeconds = 0
 let pomodoroMode: "work" | "break" = "work"
-let pomodoroPaused = false          // ← NEW
+let pomodoroPaused = false
+let pomodoroNotified = false
 
 let stopwatchTimer: NodeJS.Timeout | null = null
 let stopwatchSeconds = 0
-let stopwatchPaused = false         // ← NEW
+let stopwatchPaused = false
+
+// Store window reference for notifications
+let currentWindow: BrowserWindow | undefined = undefined
 
 /* ---------------- TYPES ---------------- */
 
@@ -53,10 +65,13 @@ export function updateSettings(workMinutes: number, breakMinutes: number) {
 /* ---------------- POMODORO ---------------- */
 
 export function startPomodoro(window?: BrowserWindow) {
+  // Store window reference
+  currentWindow = window
+
   // Resume from pause — just restart the interval, keep seconds
   if (pomodoroPaused && !pomodoroTimer) {
     pomodoroPaused = false
-    pomodoroTimer = createPomodoroInterval(window)
+    pomodoroTimer = createPomodoroInterval()
     return
   }
 
@@ -68,25 +83,38 @@ export function startPomodoro(window?: BrowserWindow) {
   pomodoroMode    = "work"
   pomodoroSeconds = settings.workMinutes * 60
   pomodoroPaused  = false
-  pomodoroTimer   = createPomodoroInterval(window)
+  pomodoroNotified = false
+  pomodoroTimer   = createPomodoroInterval()
+
+  // Send notification for work session start
+  notifyWorkSessionStart(currentWindow).catch(console.error)
 }
 
-function createPomodoroInterval(window?: BrowserWindow): NodeJS.Timeout {
+function createPomodoroInterval(): NodeJS.Timeout {
   const settings = getSettings()
 
   return setInterval(() => {
     pomodoroSeconds--
 
-    window?.webContents.send("timer:update", {
+    currentWindow?.webContents.send("timer:update", {
       seconds: pomodoroSeconds,
       mode:    pomodoroMode,
     })
 
+    // Notify when transitioning to break or work
     if (pomodoroSeconds <= 0) {
       pomodoroMode    = pomodoroMode === "work" ? "break" : "work"
       pomodoroSeconds = (pomodoroMode === "work"
         ? settings.workMinutes
         : settings.breakMinutes) * 60
+
+      // Send appropriate notification
+      if (pomodoroMode === "break") {
+        notifyBreakSessionStart(currentWindow).catch(console.error)
+      } else {
+        notifyBreakEnded(currentWindow).catch(console.error)
+      }
+      pomodoroNotified = false
     }
   }, 1000)
 }
@@ -95,8 +123,11 @@ export function pausePomodoro() {
   if (pomodoroTimer) {
     clearInterval(pomodoroTimer)
     pomodoroTimer  = null
-    pomodoroPaused = true   // remember we are paused, not stopped
+    pomodoroPaused = true
   }
+
+  // Send pause notification
+  notifyTimerPaused(currentWindow).catch(console.error)
 }
 
 export function stopPomodoro() {
@@ -108,15 +139,21 @@ export function stopPomodoro() {
   pomodoroSeconds = 0
   pomodoroMode    = "work"
   pomodoroPaused  = false
+
+  // Send stop notification
+  notifyTimerStopped(currentWindow).catch(console.error)
 }
 
 /* ---------------- STOPWATCH ---------------- */
 
 export function startStopwatch(window?: BrowserWindow) {
+  // Store window reference
+  currentWindow = window
+
   // Resume from pause — keep elapsed seconds
   if (stopwatchPaused && !stopwatchTimer) {
     stopwatchPaused = false
-    stopwatchTimer  = createStopwatchInterval(window)
+    stopwatchTimer  = createStopwatchInterval()
     return
   }
 
@@ -126,14 +163,17 @@ export function startStopwatch(window?: BrowserWindow) {
   // Fresh start
   stopwatchSeconds = 0
   stopwatchPaused  = false
-  stopwatchTimer   = createStopwatchInterval(window)
+  stopwatchTimer   = createStopwatchInterval()
+
+  // Send notification for stopwatch start
+  notifyStopwatchStart(currentWindow).catch(console.error)
 }
 
-function createStopwatchInterval(window?: BrowserWindow): NodeJS.Timeout {
+function createStopwatchInterval(): NodeJS.Timeout {
   return setInterval(() => {
     stopwatchSeconds++
 
-    window?.webContents.send("timer:update", {
+    currentWindow?.webContents.send("timer:update", {
       seconds: stopwatchSeconds,
       mode:    "stopwatch" as any,
     })
@@ -144,8 +184,11 @@ export function pauseStopwatch() {
   if (stopwatchTimer) {
     clearInterval(stopwatchTimer)
     stopwatchTimer  = null
-    stopwatchPaused = true  // remember we are paused, not stopped
+    stopwatchPaused = true
   }
+
+  // Send pause notification
+  notifyTimerPaused(currentWindow).catch(console.error)
 }
 
 export function stopStopwatch() {
@@ -156,4 +199,7 @@ export function stopStopwatch() {
   // Full reset
   stopwatchSeconds = 0
   stopwatchPaused  = false
+
+  // Send stop notification
+  notifyTimerStopped(currentWindow).catch(console.error)
 }

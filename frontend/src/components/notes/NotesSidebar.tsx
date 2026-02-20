@@ -63,7 +63,7 @@ export default function NotesSidebar() {
           />
           <ActionBtn
             title="New folder"
-            icon="📁"
+            icon="◈"
             onClick={() => createFolder(null)}
             fontSize="11px"
           />
@@ -86,7 +86,7 @@ export default function NotesSidebar() {
 
         {!loading && rootNotes.length === 0 && (
           <div style={{ padding: "24px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: "28px", marginBottom: "8px", opacity: 0.4 }}>📝</div>
+            <div style={{ fontSize: "28px", marginBottom: "8px", opacity: 0.4 }}>◉</div>
             <div
               style={{
                 fontSize: "11.5px",
