@@ -1,182 +1,189 @@
-# ChroniNotes ✦
+# ChroniNotes
 
-ChroniNotes is an **offline-first desktop productivity assistant** built specifically for students.  
-It combines **task management, Pomodoro focus sessions, and rich-text notes** into a single, distraction-free environment — with **zero cloud dependency**.
+ChroniNotes is an offline-first desktop productivity app for students and focused creators.
+It unifies tasks, notes, and timer workflows in one local-first workspace.
 
-> Your data. Your machine. Full control.
+Your data stays on your machine.
 
----
+## Why This Project
 
-## 🚀 Getting Started
+Most productivity tools split notes, tasks, and focus timers into separate apps.
+ChroniNotes combines them so context stays together:
+
+- Write notes while planning tasks.
+- Run focus sessions without leaving your workspace.
+- Keep all data local with no cloud lock-in.
+
+## Core Features
+
+- Task management with `todo`, `doing`, and `done` workflow.
+- Rich notes editor with folders/pages and auto-save.
+- Pomodoro + stopwatch + custom timer modes.
+- Syntax-highlighted code blocks in notes with language selection.
+- Local file + SQLite persistence.
+
+## Tech Stack (What, How, Why)
+
+| Layer | Used | How It Is Used | Why It Is Used |
+|---|---|---|---|
+| Desktop shell | Electron | Runs renderer + main process with IPC bridge | Native desktop UX and OS integrations |
+| Frontend | React 19 + TypeScript | SPA renderer for Dashboard/Tasks/Notes/Timer | Fast UI development with type safety |
+| Build tool | Vite | Dev server + frontend build pipeline | Fast HMR and modern bundling |
+| State | Zustand | Lightweight stores for tasks/notes/timer | Simple, predictable state updates |
+| Notes editor | TipTap | Rich text editor extensions and commands | Highly extensible editor model |
+| Code highlighting | lowlight + TipTap code block extension | Syntax colors in note code blocks | Good language highlighting inside notes |
+| Database | better-sqlite3 | Stores tasks and timer settings | Fast local persistence, no external service |
+| Notes storage | JSON files in app data folder | Each note/folder stored as real files | Easy backup, portability, transparency |
+| Styling | Tailwind CSS + custom CSS vars | Layout + theming + component styling | Rapid UI iteration with consistent theme |
+
+## Architecture Overview
+
+- `backend/` is the Electron main process.
+- `frontend/` is the React renderer.
+- Frontend talks to backend via `window.electron.invoke(...)` IPC calls.
+- Tasks/timer settings go to SQLite.
+- Notes content/tree live as files on disk.
+
+## Installation
 
 ### Prerequisites
 
-Make sure you have the following installed:
+- Node.js (LTS recommended)
+- npm
+- Git
 
-- **[Node.js](https://nodejs.org/)** v18 or later (LTS recommended)
-- **[Git](https://git-scm.com/)**
-- **npm** (comes with Node.js)
+Windows note:
+For native modules (`better-sqlite3`) you may need Visual Studio Build Tools with C++ workload.
 
-### Installation & Setup (one command)
+### Setup
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/SamarthBhogre/ChroniNotes.git
 cd ChroniNotes
-
-# 2. Install everything + rebuild native modules
 npm run setup
 ```
 
-This single command installs dependencies for root, backend, and frontend, then rebuilds `better-sqlite3` for Electron.
+`npm run setup` does:
 
-> **Windows users**: You may need the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload installed for the native rebuild step.
+- Install root dependencies.
+- Install backend/frontend dependencies.
+- Rebuild native modules for Electron.
 
----
-
-## ▶️ Running the App
+## Running the App
 
 ```bash
 npm run dev
 ```
 
-That's it. This single command:
-1. Starts the Vite frontend dev server
-2. Waits for it to be ready at `http://localhost:5173`
-3. Compiles the backend TypeScript
-4. Launches the Electron window
+This starts:
 
-Both processes run side-by-side and are killed together when you press `Ctrl+C`.
+- Vite frontend on `http://localhost:5173`
+- Electron backend after frontend is ready
 
-### Other scripts
+### Useful Scripts
 
-| Command | What it does |
-|---------|-------------|
-| `npm run dev` | Start the full app (frontend + Electron) |
-| `npm run setup` | Install all deps + rebuild native modules |
-| `npm run build` | Production build (backend + frontend) |
-| `npm run dev:frontend` | Start only the Vite dev server |
-| `npm run dev:backend` | Build + launch only Electron |
-| `npm run install:all` | Install deps for root, backend, and frontend |
-| `npm run rebuild` | Rebuild native modules for Electron |
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Run full app (frontend + Electron) |
+| `npm run setup` | Install everything + rebuild native deps |
+| `npm run build` | Build backend + frontend |
+| `npm run dev:frontend` | Run only Vite frontend |
+| `npm run dev:backend` | Build backend and launch Electron |
+| `npm run install:all` | Install root, backend, frontend deps |
+| `npm run rebuild` | Rebuild native Electron modules |
 
----
+## Data Storage
 
-## 📁 Where is my data stored?
+| Data Type | Storage |
+|---|---|
+| Tasks + timer settings | SQLite (`chroninotes.db`) in app data directory |
+| Notes/folders | JSON files under app notes directory |
 
-| Data | Location |
-|------|----------|
-| **Notes** | Stored as real `.json` files in `<userData>/ChroniNotes/` — you can browse, back up, or edit them directly from your file explorer. |
-| **Tasks & Timer settings** | Stored in a local SQLite database at `<userData>/chroninotes.db` |
+Typical app-data locations:
 
-The `<userData>` path depends on your OS:
+- Windows: `C:\Users\<you>\AppData\Roaming\<AppName>\`
+- macOS: `~/Library/Application Support/<AppName>/`
+- Linux: `~/.config/<AppName>/`
 
-| OS | Path |
-|----|------|
-| Windows | `C:\Users\<You>\AppData\Roaming\<AppName>\` |
-| macOS | `~/Library/Application Support/<AppName>/` |
-| Linux | `~/.config/<AppName>/` |
+## Troubleshooting
 
-You can also open the notes folder directly from the app: **Hamburger menu (☰) → Open Notes Folder**.
+### 1) App does not start after install
 
----
+Try:
 
-## 🎯 Features
-
-### ✅ Task Manager
-- To Do / Doing / Done workflow
-- SQLite-backed persistence
-- Fast IPC-based updates
-
-### 🍅 Pomodoro Timer
-- Runs safely in Electron Main Process
-- Adjustable work & break durations
-- Settings persisted in SQLite
-- Background-safe (continues when window loses focus)
-
-### 📝 Rich Text Notes
-- TipTap editor (Notion-style)
-- Headings, lists, code blocks, blockquotes
-- Font selection
-- **Notion-style file tree sidebar** with folders, nested pages, inline rename
-- **Auto-save** — content saves to disk 500ms after you stop typing
-- **Real files on disk** — notes are plain JSON files you can browse in your OS
-
-### 🖥️ Desktop-First Architecture
-- Electron + React + TypeScript
-- Offline-first, local-only storage
-- No cloud, no telemetry
-
----
-
-## 🧠 Philosophy
-
-ChroniNotes is built around three principles:
-
-- **Deep Focus** — Minimal UI, keyboard-friendly, no distractions
-- **Context Awareness** — Tasks, notes, and time are connected
-- **Offline Sovereignty** — All data stays on your device
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| UI | React 19 + TypeScript |
-| Desktop | Electron |
-| State | Zustand |
-| Editor | TipTap |
-| Database | SQLite (better-sqlite3) |
-| Notes Storage | Filesystem (JSON files) |
-| Styling | Tailwind CSS |
-| Build | Vite |
-
----
-
-## 📂 Project Structure
-
-```text
-ChroniNotes/
-├── backend/                  # Electron Main Process
-│   ├── src/
-│   │   ├── db/               # SQLite setup
-│   │   ├── ipc/              # IPC handlers (tasks, timer, notes)
-│   │   ├── services/         # Business logic (timer)
-│   │   ├── main.ts
-│   │   └── preload.ts
-│   └── package.json
-│
-├── frontend/                 # Renderer (React)
-│   ├── src/
-│   │   ├── store/            # Zustand stores (tasks, timer, notes)
-│   │   ├── components/       # UI components
-│   │   │   ├── editor/       # TipTap rich editor
-│   │   │   ├── layout/       # Sidebar, Topbar
-│   │   │   └── notes/        # Notes file tree sidebar
-│   │   ├── pages/            # Dashboard, Tasks, Notes, Timer
-│   │   └── App.tsx
-│   └── package.json
-│
-└── README.md
+```bash
+npm run install:all
+npm run rebuild
+npm run dev
 ```
 
----
+Cause:
+Native module rebuild may have failed.
 
-## 🤝 Contributing
+### 2) `better-sqlite3` build errors on Windows
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feat/my-feature`)
-3. Commit your changes (`git commit -m "feat: add my feature"`)
-4. Push to the branch (`git push origin feat/my-feature`)
-5. Open a Pull Request
+Fix:
 
----
+- Install Visual Studio Build Tools.
+- Enable Desktop development with C++ workload.
+- Re-run `npm run rebuild`.
 
-## 📄 License
+### 3) Port `5173` already in use
 
-This project is open source and available under the [MIT License](LICENSE).
+Fix:
 
----
+- Stop other Vite processes.
+- Or run frontend on another port manually:
 
-**Built with ♥ for students who want to own their productivity.**
+```bash
+cd frontend
+npm run dev -- --port 5174
+```
+
+Then adjust backend `loadURL` if needed.
+
+### 4) Toolbar/buttons in Notes feel inconsistent
+
+Fix:
+
+- Reload renderer window.
+- Ensure toolbar focus/selection patches are on latest local changes.
+- Restart with `npm run dev`.
+
+### 5) Changes not showing in Electron
+
+Fix:
+
+- Hard reload the Electron renderer.
+- Restart dev process fully (`Ctrl+C` then `npm run dev`).
+- Clear cached compiled output if needed (`backend/dist`, `frontend/dist`) then rebuild.
+
+## Future Scope
+
+Planned and high-impact roadmap ideas:
+
+- Core scheduling engine for study blocks and task calendar planning.
+- Contribution streak system across timer sessions and todo completion.
+- Advanced analytics:
+  - Focus trends by day/week
+  - Task completion velocity
+  - Note activity heatmaps
+  - Session consistency scoring
+- Goal-based planning with milestones and review cycles.
+- Cross-device sync as optional encrypted mode.
+- Smart insights and reminders based on behavior patterns.
+
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch:
+`git checkout -b feat/my-feature`
+3. Commit:
+`git commit -m "feat: add my feature"`
+4. Push:
+`git push origin feat/my-feature`
+5. Open a Pull Request.
+
+## License
+
+MIT License.
