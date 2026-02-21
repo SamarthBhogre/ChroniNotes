@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -44,6 +44,20 @@
   --color-pink:     #f472b6;
   --color-yellow:   #fbbf24;
   --color-red:      #f87171;
+
+  /* ── Code Highlight ── */
+  --code-bg:        #0b1220;
+  --code-border:    rgba(129, 140, 248, 0.28);
+  --code-text:      #d6e3ff;
+  --code-muted:     #7f8db2;
+  --code-keyword:   #c792ea;
+  --code-string:    #ecc48d;
+  --code-number:    #f78c6c;
+  --code-fn:        #82aaff;
+  --code-type:      #ffcb6b;
+  --code-class:     #89ddff;
+  --code-variable:  #f07178;
+  --code-attr:      #c3e88d;
 
   /* ── Spacing ── */
   --spacing-xs:  0.25rem;
@@ -261,11 +275,11 @@ select option {
   outline: none;
   color: var(--text-primary);
   font-size: var(--font-size-base);
-  line-height: var(--line-height-relaxed);
+  line-height: var(--line-height-normal);
   caret-color: var(--accent);
 }
 
-.tiptap > * { margin-bottom: var(--spacing-md); }
+.tiptap > * { margin-bottom: var(--spacing-sm); }
 .tiptap > *:last-child { margin-bottom: 0; }
 
 /* Placeholder */
@@ -297,7 +311,15 @@ select option {
   color: var(--text-primary);
 }
 
-.tiptap p { color: var(--text-primary); }
+.tiptap p {
+  color: var(--text-primary);
+  line-height: var(--line-height-normal);
+  margin: 0;
+}
+
+.tiptap > p {
+  margin-bottom: 0;
+}
 
 /* Lists — FIXED visibility */
 .tiptap ul, .tiptap ol {
@@ -309,7 +331,7 @@ select option {
 .tiptap li {
   margin: var(--spacing-sm) 0;
   padding-left: var(--spacing-xs);
-  line-height: var(--line-height-relaxed);
+  line-height: var(--line-height-normal);
   color: var(--text-primary);
 }
 .tiptap li::marker { color: var(--accent); font-weight: 600; }
@@ -323,10 +345,10 @@ select option {
 
 /* Code */
 .tiptap pre {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(8px);
-  color: #e2e8f0;
+  background: linear-gradient(155deg, rgba(11, 18, 32, 0.94), rgba(8, 14, 26, 0.92));
+  border: 1px solid var(--code-border);
+  backdrop-filter: blur(10px);
+  color: var(--code-text);
   padding: var(--spacing-lg);
   border-radius: var(--radius-lg);
   overflow-x: auto;
@@ -334,6 +356,8 @@ select option {
   font-size: 0.875rem;
   line-height: 1.6;
   margin: var(--spacing-lg) 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 8px 24px rgba(0,0,0,0.35);
+  tab-size: 2;
 }
 .tiptap code {
   background: rgba(129, 140, 248, 0.12);
@@ -347,6 +371,65 @@ select option {
 .tiptap pre code {
   background: transparent; color: inherit;
   padding: 0; border: none; font-size: inherit;
+  text-shadow: none;
+}
+
+/* Lowlight token colors (VS Code-inspired) */
+.tiptap pre code .hljs-comment,
+.tiptap pre code .hljs-quote,
+.tiptap pre code .hljs-doctag {
+  color: var(--code-muted);
+  font-style: italic;
+}
+
+.tiptap pre code .hljs-keyword,
+.tiptap pre code .hljs-selector-tag,
+.tiptap pre code .hljs-meta .hljs-keyword {
+  color: var(--code-keyword);
+}
+
+.tiptap pre code .hljs-string,
+.tiptap pre code .hljs-regexp,
+.tiptap pre code .hljs-addition,
+.tiptap pre code .hljs-meta .hljs-string {
+  color: var(--code-string);
+}
+
+.tiptap pre code .hljs-number,
+.tiptap pre code .hljs-literal,
+.tiptap pre code .hljs-symbol,
+.tiptap pre code .hljs-deletion {
+  color: var(--code-number);
+}
+
+.tiptap pre code .hljs-title,
+.tiptap pre code .hljs-title.function_,
+.tiptap pre code .hljs-function .hljs-title {
+  color: var(--code-fn);
+}
+
+.tiptap pre code .hljs-type,
+.tiptap pre code .hljs-built_in,
+.tiptap pre code .hljs-title.class_ {
+  color: var(--code-type);
+}
+
+.tiptap pre code .hljs-class,
+.tiptap pre code .hljs-variable.language_ {
+  color: var(--code-class);
+}
+
+.tiptap pre code .hljs-params,
+.tiptap pre code .hljs-variable,
+.tiptap pre code .hljs-template-variable {
+  color: var(--code-variable);
+}
+
+.tiptap pre code .hljs-attr,
+.tiptap pre code .hljs-attribute,
+.tiptap pre code .hljs-property,
+.tiptap pre code .hljs-name {
+  color: var(--code-attr);
 }
 
 /* Blockquote */
@@ -367,7 +450,20 @@ select option {
 
 /* Strong / Em */
 .tiptap strong { color: var(--text-primary); font-weight: 700; }
-.tiptap em { color: var(--text-secondary); }
+.tiptap em {
+  color: var(--text-primary);
+  font-style: italic;
+  font-weight: inherit;
+  line-height: inherit;
+}
+.tiptap u {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 1px;
+  line-height: inherit;
+}
 
 /* ═══════════════════════════════════
    PULSE ANIMATION

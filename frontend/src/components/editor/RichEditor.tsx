@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react"
-import { EditorContent, useEditor } from "@tiptap/react"
+import { useEffect, useRef, useState } from "react"
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { TextStyle } from "@tiptap/extension-text-style"
 import FontFamily from "@tiptap/extension-font-family"
+import Underline from "@tiptap/extension-underline"
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
 import Placeholder from "@tiptap/extension-placeholder"
-import { createLowlight } from "lowlight"
+import { common, createLowlight } from "lowlight"
 
 interface Props {
   noteId: string
@@ -13,10 +14,40 @@ interface Props {
   onSave: (json: any) => void
 }
 
-const lowlight = createLowlight()
+const CODE_LANG_OPTIONS = [
+  { label: "TypeScript", value: "typescript" },
+  { label: "React (JSX)", value: "jsx" },
+  { label: "Python", value: "python" },
+  { label: "Java", value: "java" },
+  { label: "C", value: "c" },
+  { label: "C++", value: "cpp" },
+] as const
+
+const DEFAULT_CODE_LANGUAGE = "typescript"
+const DEFAULT_TOOLBAR_STATE = {
+  bold: false,
+  italic: false,
+  underline: false,
+  h1: false,
+  h2: false,
+  h3: false,
+  bulletList: false,
+  orderedList: false,
+  codeBlock: false,
+  blockquote: false,
+  codeLanguage: undefined as string | undefined,
+}
+
+const lowlight = createLowlight(common)
+lowlight.registerAlias({
+  javascript: ["js", "jsx", "react"],
+  typescript: ["ts", "tsx"],
+  cpp: ["c++"],
+})
 
 export default function RichEditor({ noteId, content, onSave }: Props) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [preferredCodeLanguage, setPreferredCodeLanguage] = useState<string>(DEFAULT_CODE_LANGUAGE)
 
   const editor = useEditor({
     extensions: [
@@ -25,9 +56,13 @@ export default function RichEditor({ noteId, content, onSave }: Props) {
         orderedList: { keepMarks: true },
         codeBlock: false,
       }),
-      CodeBlockLowlight.configure({ lowlight }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: DEFAULT_CODE_LANGUAGE,
+      }),
       TextStyle,
       FontFamily,
+      Underline,
       Placeholder.configure({
         placeholder: "Start writing…",
         emptyEditorClass: "is-editor-empty",
@@ -62,6 +97,26 @@ export default function RichEditor({ noteId, content, onSave }: Props) {
     }
   }, [noteId])
 
+  const toolbarState = useEditorState({
+    editor,
+    selector: ({ editor }) =>
+      !editor
+        ? DEFAULT_TOOLBAR_STATE
+        : {
+            bold: editor.isActive("bold"),
+            italic: editor.isActive("italic"),
+            underline: editor.isActive("underline"),
+            h1: editor.isActive("heading", { level: 1 }),
+            h2: editor.isActive("heading", { level: 2 }),
+            h3: editor.isActive("heading", { level: 3 }),
+            bulletList: editor.isActive("bulletList"),
+            orderedList: editor.isActive("orderedList"),
+            codeBlock: editor.isActive("codeBlock"),
+            blockquote: editor.isActive("blockquote"),
+            codeLanguage: editor.getAttributes("codeBlock").language as string | undefined,
+          },
+  })
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -70,6 +125,8 @@ export default function RichEditor({ noteId, content, onSave }: Props) {
   }, [])
 
   if (!editor) return null
+
+  const activeCodeLanguage = toolbarState.codeLanguage || preferredCodeLanguage
 
   return (
     <div className="flex flex-col w-full h-full">
@@ -88,13 +145,17 @@ export default function RichEditor({ noteId, content, onSave }: Props) {
       >
         {/* ── Text style group ── */}
         <ToolGroup>
-          <Btn label="B"  title="Bold"   active={editor.isActive("bold")}
+          <Btn label="B"  title="Bold"   active={toolbarState.bold}
             onClick={() => editor.chain().focus().toggleBold().run()}
             style={{ fontWeight: 700 }}
           />
-          <Btn label="I"  title="Italic" active={editor.isActive("italic")}
+          <Btn label="I"  title="Italic" active={toolbarState.italic}
             onClick={() => editor.chain().focus().toggleItalic().run()}
             style={{ fontStyle: "italic" }}
+          />
+          <Btn label="U" title="Underline" active={toolbarState.underline}
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            style={{ textDecoration: "underline", textDecorationThickness: "1.5px" }}
           />
         </ToolGroup>
 
@@ -103,15 +164,15 @@ export default function RichEditor({ noteId, content, onSave }: Props) {
         {/* ── Heading group ── */}
         <ToolGroup>
           <Btn label="H1" title="Heading 1"
-            active={editor.isActive("heading", { level: 1 })}
+            active={toolbarState.h1}
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           />
           <Btn label="H2" title="Heading 2"
-            active={editor.isActive("heading", { level: 2 })}
+            active={toolbarState.h2}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           />
           <Btn label="H3" title="Heading 3"
-            active={editor.isActive("heading", { level: 3 })}
+            active={toolbarState.h3}
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           />
         </ToolGroup>
@@ -121,11 +182,11 @@ export default function RichEditor({ noteId, content, onSave }: Props) {
         {/* ── List group ── */}
         <ToolGroup>
           <Btn label="•"  title="Bullet List"
-            active={editor.isActive("bulletList")}
+            active={toolbarState.bulletList}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
           />
           <Btn label="1." title="Numbered List"
-            active={editor.isActive("orderedList")}
+            active={toolbarState.orderedList}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
           />
         </ToolGroup>
@@ -135,14 +196,49 @@ export default function RichEditor({ noteId, content, onSave }: Props) {
         {/* ── Block group ── */}
         <ToolGroup>
           <Btn label="<>" title="Code Block"
-            active={editor.isActive("codeBlock")}
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            active={toolbarState.codeBlock}
+            onClick={() => {
+              if (toolbarState.codeBlock) {
+                editor.chain().focus().toggleCodeBlock().run()
+                return
+              }
+              editor.chain().focus().setCodeBlock({ language: preferredCodeLanguage }).run()
+            }}
           />
           <Btn label="❝"  title="Blockquote"
-            active={editor.isActive("blockquote")}
+            active={toolbarState.blockquote}
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
           />
         </ToolGroup>
+
+        <select
+          value={activeCodeLanguage}
+          onChange={e => {
+            const language = e.target.value
+            setPreferredCodeLanguage(language)
+            if (editor.isActive("codeBlock")) {
+              editor.chain().focus().updateAttributes("codeBlock", { language }).run()
+            }
+          }}
+          title="Code Language"
+          style={{
+            marginLeft: "8px",
+            height: "28px",
+            padding: "0 10px",
+            borderRadius: "var(--radius-md)",
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+            color: "var(--text-secondary)",
+            fontSize: "11.5px",
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "all 0.15s",
+          }}
+        >
+          {CODE_LANG_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
 
         {/* ── Font selector ── */}
         <select
@@ -227,6 +323,7 @@ function Btn({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
       style={{
@@ -242,6 +339,10 @@ function Btn({
         transition: "all 0.15s ease",
         cursor: "pointer",
         ...style,
+      }}
+      onMouseDown={e => {
+        // Keep editor selection/focus when clicking toolbar controls.
+        e.preventDefault()
       }}
       onMouseEnter={e => {
         if (!active) {
