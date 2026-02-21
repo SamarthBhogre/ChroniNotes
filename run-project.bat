@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set "PROJECT_DIR=D:\College\Semester - 6\ChorniNotes"
+set "PROJECT_DIR=<dir>"
 cd /d "%PROJECT_DIR%"
 
 if not exist node_modules (
@@ -16,3 +16,4 @@ if not exist node_modules (
 echo Starting ChroniNotes development app...
 call npm run dev
 exit /b %ERRORLEVEL%
+
