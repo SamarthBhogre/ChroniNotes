@@ -33,11 +33,12 @@ function RingProgress({
   const circ   = 2 * Math.PI * r
   const offset = circ * (1 - Math.max(0, Math.min(1, progress)))
 
+  // All colors now via CSS variables — theme-aware
   const color = isPaused
-    ? "rgba(129,140,248,0.4)"
+    ? "var(--accent-border)"
     : isBreak
-    ? "rgba(52,211,153,0.9)"
-    : "rgba(129,140,248,0.9)"
+    ? "var(--color-green)"
+    : "var(--accent)"
 
   return (
     <svg
@@ -46,12 +47,12 @@ function RingProgress({
         position: "absolute", inset: 0,
         transform: "rotate(-90deg)",
         transition: "opacity 0.4s ease",
-        opacity: isRunning || isPaused ? 1 : 0.2,
+        opacity: isRunning || isPaused ? 1 : 0.25,
       }}
     >
       <defs>
         <filter id="ringGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feGaussianBlur stdDeviation="3" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
@@ -59,11 +60,15 @@ function RingProgress({
         </filter>
       </defs>
 
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke="rgba(255,255,255,0.05)" strokeWidth={stroke}
+      {/* Track ring — uses glass border so it's visible on both light & dark */}
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke="var(--glass-border-strong)" strokeWidth={stroke}
       />
 
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none"
+      {/* Progress arc */}
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color} strokeWidth={stroke} strokeLinecap="round"
         strokeDasharray={circ} strokeDashoffset={offset}
         filter="url(#ringGlow)"
@@ -109,7 +114,7 @@ function AnimTimer({ seconds, compact }: { seconds: number; compact?: boolean })
       <AnimDigit value={m[0]} />
       <AnimDigit value={m[1]} />
       <span style={{
-        opacity: 0.5,
+        opacity: 0.4,
         margin: compact ? "0 1px" : "0 2px",
         fontWeight: 300,
       }}>:</span>
@@ -136,10 +141,6 @@ export default function Timer() {
   const [customInput, setCustomInput] = useState(customMinutes)
 
   const windowHeight = useWindowHeight()
-
-  // Layout thresholds:
-  // < 520px → horizontal (ring left, settings right), minimal chrome
-  // < 420px → horizontal + allow scroll as last resort
   const isHorizontal = windowHeight < 520
   const isTiny       = windowHeight < 380
 
@@ -148,39 +149,74 @@ export default function Timer() {
     setWorkInput(workMinutes)
     setBreakInput(breakMinutes)
   }, [workMinutes, breakMinutes])
-  useEffect(() => {
-    setCustomInput(customMinutes)
-  }, [customMinutes])
-  useEffect(() => {
-    window.electron.on("timer:update", updateFromMain)
-  }, [])
+  useEffect(() => { setCustomInput(customMinutes) }, [customMinutes])
+  useEffect(() => { window.electron.on("timer:update", updateFromMain) }, [])
 
   const isBreak = tool === "pomodoro" && isRunning && mode === "break"
 
   const statusText = isRunning
     ? tool === "pomodoro"
       ? mode === "work" ? "Focus session active" : "Break time active"
-      : tool === "stopwatch"
-      ? "Stopwatch running"
-      : "Timer running"
-    : isPaused
-    ? "Session paused"
+      : tool === "stopwatch" ? "Stopwatch running" : "Timer running"
+    : isPaused ? "Session paused"
     : "Ready to start"
 
   const totalSeconds =
     tool === "pomodoro"
       ? (mode === "work" ? workMinutes : breakMinutes) * 60
-      : tool === "timer"
-      ? customInput * 60
-      : 0
+      : tool === "timer" ? customInput * 60 : 0
 
-  const progress =
-    totalSeconds > 0 ? seconds / totalSeconds : 1
+  const progress = totalSeconds > 0 ? seconds / totalSeconds : 1
 
-  const ringSize = isHorizontal ? 140 : 200
+  const ringSize     = isHorizontal ? 140 : 200
   const fontSizeTimer = isHorizontal ? "1.7rem" : "clamp(2rem, 8vw, 2.6rem)"
 
-  /* ── Shared ring + clock block ── */
+  // Timer digit color — fully CSS-var based
+  const timerColor = isRunning
+    ? isBreak ? "var(--color-green)" : "var(--text-primary)"
+    : isPaused ? "var(--accent)"
+    : "var(--text-secondary)"
+
+  // Clock face ring border color — CSS-var based
+  const ringBorderColor = isRunning
+    ? isBreak ? "var(--color-green)" : "var(--accent-border)"
+    : "var(--glass-border)"
+
+  // Clock face glow — CSS-var based
+  const ringGlow = isRunning
+    ? `0 0 32px var(--accent-glow), inset 0 0 20px var(--accent-dim)`
+    : "none"
+
+  /* ── Mode toggle (shared) ── */
+  const ModeToggle = ({ align = "center" }: { align?: "center" | "left" }) => (
+    <div style={{
+      display: "flex",
+      width: "fit-content",
+      padding: "3px",
+      borderRadius: "var(--radius-lg)",
+      background: "var(--glass-bg)",
+      border: "1px solid var(--glass-border)",
+      ...(align === "center" ? { margin: "0 auto" } : {}),
+    }}>
+      {(["pomodoro", "timer", "stopwatch"] as const).map(t => (
+        <button key={t} onClick={() => setTool(t as any)} style={{
+          padding: isHorizontal ? "5px 12px" : "6px clamp(12px, 3vw, 18px)",
+          borderRadius: "var(--radius-sm)",
+          fontSize: "11.5px", fontWeight: 600,
+          color: tool === t ? "var(--text-primary)" : "var(--text-tertiary)",
+          background: tool === t ? "var(--glass-bg-hover)" : "transparent",
+          border: `1px solid ${tool === t ? "var(--glass-border-strong)" : "transparent"}`,
+          boxShadow: tool === t ? "var(--glass-shadow)" : "none",
+          transition: "all 0.2s ease",
+          textTransform: "capitalize",
+        }}>
+          {t}
+        </button>
+      ))}
+    </div>
+  )
+
+  /* ── Clock face + status ── */
   const ClockBlock = (
     <div style={{ textAlign: "center", flexShrink: 0 }}>
       <div style={{
@@ -188,18 +224,11 @@ export default function Timer() {
         width: `${ringSize}px`,
         height: `${ringSize}px`,
         borderRadius: "50%",
-        background: "rgba(0,0,0,0.25)",
-        border: `1.5px solid ${
-          isRunning
-            ? isBreak ? "rgba(52,211,153,0.25)" : "rgba(129,140,248,0.25)"
-            : "var(--glass-border)"
-        }`,
-        boxShadow: isRunning
-          ? isBreak
-            ? "0 0 40px rgba(52,211,153,0.15), inset 0 0 24px rgba(52,211,153,0.03)"
-            : "0 0 40px var(--accent-glow), inset 0 0 24px rgba(99,102,241,0.03)"
-          : "none",
-        transition: "border-color 0.6s ease, box-shadow 0.6s ease",
+        // Glass bg adapts: light on dark themes, white on light themes
+        background: "var(--glass-bg)",
+        border: `1.5px solid ${ringBorderColor}`,
+        boxShadow: ringGlow,
+        transition: "border-color 0.6s ease, box-shadow 0.6s ease, background 0.4s ease",
         marginBottom: isHorizontal ? 0 : "12px",
         position: "relative",
       }}>
@@ -211,15 +240,12 @@ export default function Timer() {
           compact={isHorizontal}
         />
 
+        {/* Inner ring decoration */}
         <div style={{
           position: "absolute",
           inset: isHorizontal ? "8px" : "12px",
           borderRadius: "50%",
-          border: `1px solid ${
-            isRunning
-              ? isBreak ? "rgba(52,211,153,0.15)" : "rgba(129,140,248,0.15)"
-              : "var(--glass-border)"
-          }`,
+          border: `1px solid ${isRunning ? "var(--accent-border)" : "var(--glass-border)"}`,
           transition: "border-color 0.6s ease",
         }} />
 
@@ -228,10 +254,7 @@ export default function Timer() {
           fontSize: fontSizeTimer,
           fontWeight: 700, letterSpacing: "-1.5px",
           fontVariantNumeric: "tabular-nums",
-          color: isRunning
-            ? isBreak ? "var(--color-green)" : "var(--text-primary)"
-            : isPaused ? "var(--accent)"
-            : "var(--text-secondary)",
+          color: timerColor,
           transition: "color 0.4s ease",
           position: "relative", zIndex: 1,
           display: "inline-flex", alignItems: "center",
@@ -240,16 +263,15 @@ export default function Timer() {
         </span>
       </div>
 
-      {/* Status dot + text — hide in tiny mode to save vertical space */}
+      {/* Status dot + text */}
       {!isTiny && (
-        <div className="flex items-center justify-center gap-2" style={{ marginTop: isHorizontal ? "8px" : 0 }}>
+        <div className="flex items-center justify-center gap-2"
+          style={{ marginTop: isHorizontal ? "8px" : 0 }}>
           {(isRunning || isPaused) && (
             <span style={{
               width: "5px", height: "5px", borderRadius: "50%",
-              background: isPaused
-                ? "var(--accent)"
-                : isBreak ? "var(--color-green)" : "var(--accent)",
-              boxShadow: `0 0 5px ${isPaused ? "var(--accent)" : isBreak ? "var(--color-green)" : "var(--accent)"}`,
+              background: isBreak ? "var(--color-green)" : "var(--accent)",
+              boxShadow: `0 0 5px ${isBreak ? "var(--color-green)" : "var(--accent)"}`,
               display: "inline-block",
               animation: isRunning ? "pulse-glow 2s ease-in-out infinite" : "none",
             }} />
@@ -269,12 +291,9 @@ export default function Timer() {
     </div>
   )
 
-  /* ── Controls block ── */
+  /* ── Controls ── */
   const ControlsBlock = (
-    <div
-      className="flex justify-center gap-2 flex-wrap"
-      style={{ flexShrink: 0 }}
-    >
+    <div className="flex justify-center gap-2 flex-wrap" style={{ flexShrink: 0 }}>
       {!isRunning && (
         <button onClick={start} className="flex items-center gap-2"
           style={{
@@ -316,7 +335,7 @@ export default function Timer() {
             transition: "all 0.2s ease",
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = "rgba(129,140,248,0.25)"
+            e.currentTarget.style.background = "var(--accent-border)"
             e.currentTarget.style.transform = "translateY(-1px)"
           }}
           onMouseLeave={e => {
@@ -336,18 +355,18 @@ export default function Timer() {
           style={{
             padding: isHorizontal ? "7px 16px" : "10px 20px",
             borderRadius: "var(--radius-lg)",
-            background: "rgba(248,113,113,0.12)",
+            background: "var(--accent-dim)",
             color: "var(--color-red)", fontWeight: 600,
             fontSize: isHorizontal ? "12px" : "13px",
-            border: "1px solid rgba(248,113,113,0.25)",
+            border: "1px solid var(--accent-border)",
             transition: "all 0.2s ease",
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = "rgba(248,113,113,0.22)"
+            e.currentTarget.style.background = "var(--glass-bg-hover)"
             e.currentTarget.style.transform = "translateY(-1px)"
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = "rgba(248,113,113,0.12)"
+            e.currentTarget.style.background = "var(--accent-dim)"
             e.currentTarget.style.transform = "translateY(0)"
           }}
         >
@@ -378,9 +397,10 @@ export default function Timer() {
           <div className="flex justify-center">
             <button
               disabled={isRunning || workInput < 1 || breakInput < 1}
-              onClick={() => {
-                updateSettings(Math.max(1, Math.floor(workInput)), Math.max(1, Math.floor(breakInput)))
-              }}
+              onClick={() => updateSettings(
+                Math.max(1, Math.floor(workInput)),
+                Math.max(1, Math.floor(breakInput))
+              )}
               style={{
                 padding: isHorizontal ? "5px 16px" : "7px 20px",
                 borderRadius: "var(--radius-md)",
@@ -407,24 +427,14 @@ export default function Timer() {
         <SettingsSection title="Custom Timer" compact={isHorizontal}>
           <div className="flex flex-col items-center gap-2">
             <InputField
-              label="Duration"
-              value={customInput}
-              onChange={v => {
-                setCustomInput(v)
-                setCustom(v)
-              }}
-              max={240}
-              disabled={isRunning}
-              compact={isHorizontal}
+              label="Duration" value={customInput}
+              onChange={v => { setCustomInput(v); setCustom(v) }}
+              max={240} disabled={isRunning} compact={isHorizontal}
             />
             <QuickPresets
               value={customInput}
-              onChange={v => {
-                setCustomInput(v)
-                setCustom(v)
-              }}
-              disabled={isRunning}
-              compact={isHorizontal}
+              onChange={v => { setCustomInput(v); setCustom(v) }}
+              disabled={isRunning} compact={isHorizontal}
             />
           </div>
         </SettingsSection>
@@ -443,118 +453,63 @@ export default function Timer() {
   )
 
   /* ══════════════════════════════════
-     RENDER — two layout branches
+     RENDER
   ══════════════════════════════════ */
   return (
     <div
       className="h-full flex flex-col"
-      style={{
-        color: "var(--text-primary)",
-        overflow: isTiny ? "auto" : "hidden",
-      }}
+      style={{ color: "var(--text-primary)", overflow: isTiny ? "auto" : "hidden" }}
     >
       {isHorizontal ? (
-        /* ────────────── HORIZONTAL LAYOUT (short window) ────────────── */
+        /* ── HORIZONTAL LAYOUT ── */
         <div style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "stretch",
-          padding: "10px 16px",
-          gap: "12px",
-          minHeight: 0,
-          overflow: isTiny ? "auto" : "hidden",
+          flex: 1, display: "flex", alignItems: "stretch",
+          padding: "10px 16px", gap: "12px",
+          minHeight: 0, overflow: isTiny ? "auto" : "hidden",
         }}>
-          {/* Left column: ring */}
           <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            gap: "10px",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            flexShrink: 0, gap: "10px",
           }}>
             {ClockBlock}
             {ControlsBlock}
           </div>
 
-          {/* Divider */}
           <div style={{
-            width: "1px",
-            background: "var(--glass-border)",
-            flexShrink: 0,
-            alignSelf: "stretch",
-            margin: "4px 0",
+            width: "1px", background: "var(--glass-border)",
+            flexShrink: 0, alignSelf: "stretch", margin: "4px 0",
           }} />
 
-          {/* Right column: toggle + settings — scrollable only if truly too tall */}
           <div style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-            overflowY: isTiny ? "auto" : "hidden",
-            minHeight: 0,
+            flex: 1, display: "flex", flexDirection: "column",
+            gap: "10px", overflowY: isTiny ? "auto" : "hidden", minHeight: 0,
           }}>
-            {/* Mode toggle — horizontal row */}
-            <div style={{
-              display: "flex",
-              padding: "3px",
-              borderRadius: "var(--radius-lg)",
-              background: "rgba(0,0,0,0.25)",
-              border: "1px solid var(--glass-border)",
-              width: "fit-content",
-              alignSelf: "flex-start",
-            }}>
-              {(["pomodoro", "timer", "stopwatch"] as const).map(t => (
-                <button key={t} onClick={() => setTool(t as any)} style={{
-                  padding: "5px 12px",
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: "10.5px", fontWeight: 600,
-                  color: tool === t ? "var(--text-primary)" : "var(--text-tertiary)",
-                  background: tool === t ? "var(--glass-bg-hover)" : "transparent",
-                  border: `1px solid ${tool === t ? "var(--glass-border-strong)" : "transparent"}`,
-                  boxShadow: tool === t ? "var(--glass-shadow)" : "none",
-                  transition: "all 0.2s ease",
-                  textTransform: "capitalize",
-                }}>
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {/* Settings — no inner scroll, the column above handles it */}
-            <div style={{ flex: 1, minHeight: 0 }}>
-              {SettingsBlock}
-            </div>
+            <ModeToggle align="left" />
+            <div style={{ flex: 1, minHeight: 0 }}>{SettingsBlock}</div>
           </div>
         </div>
+
       ) : (
-        /* ────────────── VERTICAL LAYOUT (normal window) ────────────── */
+        /* ── VERTICAL LAYOUT ── */
         <div style={{
-          flex: 1,
-          display: "flex", flexDirection: "column",
+          flex: 1, display: "flex", flexDirection: "column",
           maxWidth: "540px", width: "100%",
           margin: "0 auto",
           padding: "clamp(24px, 5vh, 48px) clamp(20px, 4vw, 32px)",
-          overflow: "hidden",
-          minHeight: 0,
+          overflow: "hidden", minHeight: 0,
         }}>
-
           {/* Header */}
           <div style={{ marginBottom: "clamp(20px, 4vh, 32px)", flexShrink: 0 }}>
-            <div
-              className="inline-flex items-center gap-2 mb-3"
-              style={{
-                padding: "3px 10px", borderRadius: "20px",
-                background: "var(--accent-dim)",
-                border: "1px solid var(--accent-border)",
-                fontSize: "10px", fontWeight: 600,
-                color: "var(--accent)", letterSpacing: "0.3px",
-              }}
-            >
+            <div className="inline-flex items-center gap-2 mb-3" style={{
+              padding: "3px 10px", borderRadius: "20px",
+              background: "var(--accent-dim)",
+              border: "1px solid var(--accent-border)",
+              fontSize: "10px", fontWeight: 600,
+              color: "var(--accent)", letterSpacing: "0.3px",
+            }}>
               ⊹ Timer
             </div>
-
             <h1 style={{
               fontSize: "clamp(1.6rem, 5vw, 2rem)", fontWeight: 700,
               letterSpacing: "-0.5px", lineHeight: 1.15, marginBottom: "6px",
@@ -574,8 +529,7 @@ export default function Timer() {
             borderRadius: "var(--radius-xl)",
             padding: "clamp(20px, 4vh, 28px) clamp(18px, 3vw, 24px)",
             position: "relative", overflow: "hidden",
-            flex: 1, display: "flex", flexDirection: "column",
-            minHeight: 0,
+            flex: 1, display: "flex", flexDirection: "column", minHeight: 0,
           }}>
             {/* Ambient glow */}
             <div style={{
@@ -589,29 +543,8 @@ export default function Timer() {
             }} />
 
             {/* Mode toggle */}
-            <div className="flex mx-auto" style={{
-              width: "fit-content", padding: "3px",
-              borderRadius: "var(--radius-lg)",
-              background: "rgba(0,0,0,0.25)",
-              border: "1px solid var(--glass-border)",
-              marginBottom: "clamp(20px, 4vh, 28px)",
-              flexShrink: 0,
-            }}>
-              {(["pomodoro", "timer", "stopwatch"] as const).map(t => (
-                <button key={t} onClick={() => setTool(t as any)} style={{
-                  padding: "6px clamp(12px, 3vw, 18px)",
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: "11.5px", fontWeight: 600,
-                  color: tool === t ? "var(--text-primary)" : "var(--text-tertiary)",
-                  background: tool === t ? "var(--glass-bg-hover)" : "transparent",
-                  border: `1px solid ${tool === t ? "var(--glass-border-strong)" : "transparent"}`,
-                  boxShadow: tool === t ? "var(--glass-shadow)" : "none",
-                  transition: "all 0.2s ease",
-                  textTransform: "capitalize",
-                }}>
-                  {t}
-                </button>
-              ))}
+            <div style={{ marginBottom: "clamp(20px, 4vh, 28px)", flexShrink: 0 }}>
+              <ModeToggle />
             </div>
 
             {/* Ring */}
@@ -624,20 +557,12 @@ export default function Timer() {
             </div>
 
             {/* Controls */}
-            <div style={{
-              marginBottom: "clamp(16px, 3vh, 20px)",
-              flexShrink: 0,
-            }}>
+            <div style={{ marginBottom: "clamp(16px, 3vh, 20px)", flexShrink: 0 }}>
               {ControlsBlock}
             </div>
 
-            {/* Settings — only scrolls when the card truly overflows */}
-            <div style={{
-              flex: 1,
-              overflowY: "auto",
-              overflowX: "hidden",
-              minHeight: 0,
-            }}>
+            {/* Settings */}
+            <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0 }}>
               {SettingsBlock}
             </div>
           </div>
@@ -648,12 +573,8 @@ export default function Timer() {
 }
 
 /* ── Settings Section ── */
-function SettingsSection({
-  title, children, compact,
-}: {
-  title: string
-  children: React.ReactNode
-  compact?: boolean
+function SettingsSection({ title, children, compact }: {
+  title: string; children: React.ReactNode; compact?: boolean
 }) {
   return (
     <div style={{
@@ -674,15 +595,9 @@ function SettingsSection({
 }
 
 /* ── Input Field ── */
-function InputField({
-  label, value, onChange, max, disabled, compact,
-}: {
-  label: string
-  value: number
-  onChange: (v: number) => void
-  max: number
-  disabled: boolean
-  compact?: boolean
+function InputField({ label, value, onChange, max, disabled, compact }: {
+  label: string; value: number; onChange: (v: number) => void
+  max: number; disabled: boolean; compact?: boolean
 }) {
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -693,16 +608,14 @@ function InputField({
         {label} (min)
       </label>
       <input
-        type="number" value={value}
-        disabled={disabled}
+        type="number" value={value} disabled={disabled}
         onChange={e => onChange(+e.target.value)}
         min="1" max={max}
         style={{
           width: compact ? "58px" : "68px",
           padding: compact ? "5px 0" : "7px 0",
           textAlign: "center",
-          fontSize: compact ? "13px" : "14px",
-          fontWeight: 700,
+          fontSize: compact ? "13px" : "14px", fontWeight: 700,
           borderRadius: "var(--radius-md)",
           background: "var(--glass-bg)",
           border: "1px solid var(--glass-border)",
@@ -727,22 +640,14 @@ function InputField({
 }
 
 /* ── Quick Presets ── */
-function QuickPresets({
-  value, onChange, disabled, compact,
-}: {
-  value: number
-  onChange: (v: number) => void
-  disabled: boolean
-  compact?: boolean
+function QuickPresets({ value, onChange, disabled, compact }: {
+  value: number; onChange: (v: number) => void; disabled: boolean; compact?: boolean
 }) {
   const presets = [5, 10, 15, 30, 60]
   return (
     <div className="flex gap-1.5 flex-wrap justify-center">
       {presets.map(p => (
-        <button
-          key={p}
-          onClick={() => onChange(p)}
-          disabled={disabled}
+        <button key={p} onClick={() => onChange(p)} disabled={disabled}
           style={{
             padding: compact ? "4px 9px" : "5px 12px",
             borderRadius: "var(--radius-sm)",

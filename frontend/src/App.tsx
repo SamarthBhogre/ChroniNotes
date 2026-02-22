@@ -5,27 +5,38 @@ import Dashboard from "./pages/Dashboard"
 import Tasks from "./pages/Tasks"
 import Notes from "./pages/Notes"
 import Timer from "./pages/Timer"
+import Settings from "./pages/Settings"
 import WelcomeScreen from "./components/WelcomeScreen"
+
+// Initialize theme store on app boot (applies saved theme from localStorage)
+import "./store/theme.store"
 
 type Page = "dashboard" | "tasks" | "notes" | "timer"
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard")
   const [showWelcome, setShowWelcome] = useState(true)
+  const [showSettings, setShowSettings] = useState(false)
 
   return (
     <div
       className="flex h-screen overflow-hidden"
       style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}
     >
-      {/* ── Windows 11 OOBE-style Welcome Screen ── */}
+      {/* ── Welcome screen ── */}
       {showWelcome && (
         <WelcomeScreen onFinished={() => setShowWelcome(false)} />
       )}
-      {/* ── Custom Topbar with window controls ── */}
-      <Topbar />
 
-      {/* ── Animated background orbs (hidden during loading) ── */}
+      {/* ── Settings modal (above everything) ── */}
+      {showSettings && (
+        <Settings onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* ── Custom Topbar ── */}
+      <Topbar onOpenSettings={() => setShowSettings(true)} />
+
+      {/* ── Animated background orbs ── */}
       {!showWelcome && (
         <div className="bg-orbs">
           <div className="bg-orb bg-orb-1" />
@@ -42,7 +53,6 @@ export default function App() {
         className="relative z-10 flex-1 flex flex-col"
         style={{ minWidth: 0, marginTop: "40px", overflow: "hidden" }}
       >
-        {/* Subtle top-edge glow line */}
         <div
           className="pointer-events-none absolute top-0 left-0 right-0 h-px"
           style={{
@@ -51,7 +61,11 @@ export default function App() {
           }}
         />
 
-        <div key={page} className="page-enter h-full" style={{ overflow: page === "notes" ? "hidden" : "auto" }}>
+        <div
+          key={page}
+          className="page-enter h-full"
+          style={{ overflow: page === "notes" ? "hidden" : "auto" }}
+        >
           {page === "dashboard" && <Dashboard onNavigate={setPage} />}
           {page === "tasks"     && <Tasks />}
           {page === "notes"     && <Notes />}

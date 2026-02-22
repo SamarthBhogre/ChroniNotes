@@ -33,7 +33,6 @@ export default function WelcomeScreen({ onFinished }: Props) {
     const tick = (now: number) => {
       const elapsed = now - startTime.current
       const t = Math.min(elapsed / TOTAL_DURATION, 1)
-      // Smooth ease-out curve with gentle deceleration
       const eased = 1 - Math.pow(1 - t, 3)
       setProgress(eased * 100)
 
@@ -88,17 +87,17 @@ export default function WelcomeScreen({ onFinished }: Props) {
 
   return (
     <div className={`ws-container ${exiting ? "ws-exit" : ""}`}>
-      {/* Animated gradient background */}
+      {/* Animated gradient background — uses theme CSS vars */}
       <div className="ws-bg">
-        <div 
+        <div
           className="ws-gradient ws-gradient-1"
           style={{ transform: `translate(${progress * 0.4}px, ${progress * 0.3}px) scale(${1 + progress * 0.0012})` }}
         />
-        <div 
+        <div
           className="ws-gradient ws-gradient-2"
           style={{ transform: `translate(${progress * 0.4}px, ${progress * 0.3}px) scale(${1 + progress * 0.0012})` }}
         />
-        <div 
+        <div
           className="ws-gradient ws-gradient-3"
           style={{ transform: `translate(${progress * 0.4}px, ${progress * 0.3}px) scale(${1 + progress * 0.0012})` }}
         />
@@ -106,8 +105,6 @@ export default function WelcomeScreen({ onFinished }: Props) {
 
       {/* Subtle radial spotlight */}
       <div className="ws-spotlight" />
-
-      {/* Floating particles - disabled */}
 
       {/* Center content */}
       <div className="ws-center">
@@ -138,7 +135,7 @@ export default function WelcomeScreen({ onFinished }: Props) {
           </div>
         )}
 
-        {/* Loading dots — on middle phases (1 and 2) */}
+        {/* Loading dots */}
         {(phase === 1 || phase === 2) && (
           <div className={`ws-dots ${fadeClass}`}>
             <span className="ws-dot" style={{ animationDelay: "0s" }} />
@@ -147,7 +144,7 @@ export default function WelcomeScreen({ onFinished }: Props) {
           </div>
         )}
 
-        {/* Smooth progress bar */}
+        {/* Progress bar */}
         {phase >= 0 && (
           <div className="ws-progress-track">
             <div
@@ -164,7 +161,8 @@ export default function WelcomeScreen({ onFinished }: Props) {
 }
 
 /* ═══════════════════════════════════════════════
-   SCOPED STYLES
+   SCOPED STYLES — all colors via CSS variables
+   so the active theme applies automatically
 ═══════════════════════════════════════════════ */
 
 const welcomeStyles = `
@@ -175,7 +173,7 @@ const welcomeStyles = `
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #040608;
+  background: var(--bg-base);
   overflow: hidden;
   transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
               transform 0.7s cubic-bezier(0.4, 0, 0.2, 1),
@@ -210,19 +208,22 @@ const welcomeStyles = `
 
 .ws-gradient-1 {
   width: 650px; height: 650px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.35), transparent 70%);
+  background: radial-gradient(circle, var(--glow-a), transparent 70%);
+  opacity: 0.35;
   top: -15%; left: -10%;
   animation-delay: 0s;
 }
 .ws-gradient-2 {
   width: 550px; height: 550px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.30), transparent 70%);
+  background: radial-gradient(circle, var(--glow-b), transparent 70%);
+  opacity: 0.28;
   bottom: -15%; right: -5%;
   animation-delay: 0s;
 }
 .ws-gradient-3 {
   width: 380px; height: 380px;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.25), transparent 70%);
+  background: radial-gradient(circle, var(--glow-c), transparent 70%);
+  opacity: 0.22;
   top: 50%; left: 55%;
   transform: translate(-50%, -50%);
   animation-delay: 0s;
@@ -233,20 +234,8 @@ const welcomeStyles = `
   top: 50%; left: 50%;
   width: 900px; height: 900px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.07) 0%, transparent 60%);
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
   pointer-events: none;
-}
-
-.ws-particles {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.ws-particle {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(129, 140, 248, 0.6);
 }
 
 .ws-center {
@@ -259,7 +248,6 @@ const welcomeStyles = `
 }
 
 /* ── Logo ── */
-
 .ws-logo {
   position: relative;
   width: 84px; height: 84px;
@@ -277,18 +265,18 @@ const welcomeStyles = `
   position: absolute;
   inset: -8px;
   border-radius: 50%;
-  border: 2px solid rgba(129, 140, 248, 0.25);
+  border: 2px solid var(--accent-border);
 }
 
 .ws-logo-inner {
   width: 100%; height: 100%;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--glow-a), var(--glow-b));
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 40px rgba(99, 102, 241, 0.4),
-              0 0 80px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 8px 40px var(--accent-glow),
+              0 0 80px var(--accent-dim);
 }
 
 .ws-logo-letter {
@@ -300,7 +288,6 @@ const welcomeStyles = `
 }
 
 /* ── Text ── */
-
 .ws-text-block {
   text-align: center;
   display: flex;
@@ -311,7 +298,7 @@ const welcomeStyles = `
 
 .ws-heading {
   margin: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.95) 30%, rgba(129,140,248,0.9));
+  background: linear-gradient(135deg, var(--text-primary) 30%, var(--accent));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -320,14 +307,13 @@ const welcomeStyles = `
 
 .ws-subtext {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--text-secondary);
   font-weight: 400;
   letter-spacing: 0.3px;
   margin: 0;
 }
 
-/* ── Fade transitions (smoother & longer) ── */
-
+/* ── Fade transitions ── */
 .ws-fade-in {
   animation: wsFadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -345,7 +331,6 @@ const welcomeStyles = `
 }
 
 /* ── Loading dots ── */
-
 .ws-dots {
   display: flex;
   gap: 10px;
@@ -355,7 +340,8 @@ const welcomeStyles = `
 .ws-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
-  background: rgba(129, 140, 248, 0.8);
+  background: var(--accent);
+  opacity: 0.8;
   animation: wsDotBounce 1.2s ease-in-out infinite;
 }
 
@@ -367,17 +353,16 @@ const welcomeStyles = `
   40% {
     transform: scale(1.3) translateY(-4px);
     opacity: 1;
-    box-shadow: 0 0 14px rgba(129, 140, 248, 0.6);
+    box-shadow: 0 0 14px var(--accent-glow);
   }
 }
 
-/* ── Smooth progress bar ── */
-
+/* ── Progress bar ── */
 .ws-progress-track {
   width: 220px;
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-border);
   overflow: hidden;
   margin-top: 4px;
 }
@@ -385,8 +370,8 @@ const welcomeStyles = `
 .ws-progress-fill {
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(90deg, #6366f1, #818cf8, #8b5cf6);
-  box-shadow: 0 0 14px rgba(129, 140, 248, 0.45);
+  background: linear-gradient(90deg, var(--glow-a), var(--accent), var(--glow-b));
+  box-shadow: 0 0 14px var(--accent-glow);
   position: relative;
   will-change: width;
 }
