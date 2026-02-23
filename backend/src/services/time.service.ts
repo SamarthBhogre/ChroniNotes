@@ -17,11 +17,13 @@ let pomodoroMode: "work" | "break" = "work"
 let pomodoroPaused = false
 let pomodoroNotified = false
 
+// Track how many seconds have elapsed in the current work segment
+let workSecondsElapsed = 0
+
 let stopwatchTimer: NodeJS.Timeout | null = null
 let stopwatchSeconds = 0
 let stopwatchPaused = false
 
-// Store window reference for notifications
 let currentWindow: BrowserWindow | undefined = undefined
 
 /* ---------------- TYPES ---------------- */
@@ -29,6 +31,21 @@ let currentWindow: BrowserWindow | undefined = undefined
 type PomodoroSettingsRow = {
   work_minutes: number
   break_minutes: number
+}
+
+/* ---------------- HELPERS ---------------- */
+
+function saveFocusSession(type: "work" | "break" | "stopwatch", durationSeconds: number) {
+  if (durationSeconds < 10) return // ignore accidental micro-sessions
+  try {
+    const db = getDb()
+    db.prepare(
+      "INSERT INTO focus_sessions (type, duration_seconds, completed_at) VALUES (?, ?, CURRENT_TIMESTAMP)"
+    ).run(type, Math.floor(durationSeconds))
+    console.log(`[DB] Saved focus session: ${type} ${durationSeconds}s`)
+  } catch (e) {
+    console.error("[DB] Failed to save focus session:", e)
+  }
 }
 
 /* ---------------- SETTINGS ---------------- */
@@ -47,7 +64,6 @@ export function getSettings() {
 
 export function updateSettings(workMinutes: number, breakMinutes: number) {
   const db = getDb()
-
   const work = Math.max(1, Math.floor(Number(workMinutes) || 25))
   const brk  = Math.max(1, Math.floor(Number(breakMinutes) || 5))
 
@@ -62,31 +78,70 @@ export function updateSettings(workMinutes: number, breakMinutes: number) {
   ).run(work, brk)
 }
 
+/* ---------------- SESSION HISTORY ---------------- */
+
+export function getFocusSessionHistory() {
+  const db = getDb()
+  // Return grouped daily totals for work sessions (for heatmap)
+  return db.prepare(`
+    SELECT
+      DATE(completed_at) as date,
+      COUNT(*)           as count,
+      SUM(duration_seconds) as total_seconds
+    FROM focus_sessions
+    WHERE type = 'work'
+      AND completed_at IS NOT NULL
+    GROUP BY DATE(completed_at)
+    ORDER BY date ASC
+  `).all()
+}
+
+export function getTodayFocusMinutes() {
+  const db = getDb()
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(duration_seconds), 0) as total
+    FROM focus_sessions
+    WHERE type = 'work'
+      AND DATE(completed_at) = DATE('now')
+  `).get() as { total: number }
+  return Math.floor((row?.total ?? 0) / 60)
+}
+
+export function getYesterdayFocusMinutes() {
+  const db = getDb()
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(duration_seconds), 0) as total
+    FROM focus_sessions
+    WHERE type = 'work'
+      AND DATE(completed_at) = DATE('now', '-1 day')
+  `).get() as { total: number }
+  return Math.floor((row?.total ?? 0) / 60)
+}
+
 /* ---------------- POMODORO ---------------- */
 
 export function startPomodoro(window?: BrowserWindow) {
-  // Store window reference
   currentWindow = window
 
-  // Resume from pause — just restart the interval, keep seconds
+  // Resume from pause
   if (pomodoroPaused && !pomodoroTimer) {
     pomodoroPaused = false
     pomodoroTimer = createPomodoroInterval()
     return
   }
 
-  // Already running — do nothing
+  // Already running
   if (pomodoroTimer) return
 
   // Fresh start
   const settings = getSettings()
-  pomodoroMode    = "work"
-  pomodoroSeconds = settings.workMinutes * 60
-  pomodoroPaused  = false
-  pomodoroNotified = false
-  pomodoroTimer   = createPomodoroInterval()
+  pomodoroMode         = "work"
+  pomodoroSeconds      = settings.workMinutes * 60
+  workSecondsElapsed   = 0
+  pomodoroPaused       = false
+  pomodoroNotified     = false
+  pomodoroTimer        = createPomodoroInterval()
 
-  // Send notification for work session start
   notifyWorkSessionStart(currentWindow).catch(console.error)
 }
 
@@ -96,23 +151,34 @@ function createPomodoroInterval(): NodeJS.Timeout {
   return setInterval(() => {
     pomodoroSeconds--
 
+    // Track elapsed work time
+    if (pomodoroMode === "work") {
+      workSecondsElapsed++
+    }
+
     currentWindow?.webContents.send("timer:update", {
       seconds: pomodoroSeconds,
       mode:    pomodoroMode,
     })
 
-    // Notify when transitioning to break or work
     if (pomodoroSeconds <= 0) {
+      // Session completed naturally — save it
+      if (pomodoroMode === "work") {
+        saveFocusSession("work", workSecondsElapsed)
+        workSecondsElapsed = 0
+      }
+
+      // Flip mode
       pomodoroMode    = pomodoroMode === "work" ? "break" : "work"
       pomodoroSeconds = (pomodoroMode === "work"
         ? settings.workMinutes
         : settings.breakMinutes) * 60
 
-      // Send appropriate notification
       if (pomodoroMode === "break") {
         notifyBreakSessionStart(currentWindow).catch(console.error)
       } else {
         notifyBreakEnded(currentWindow).catch(console.error)
+        workSecondsElapsed = 0
       }
       pomodoroNotified = false
     }
@@ -125,8 +191,6 @@ export function pausePomodoro() {
     pomodoroTimer  = null
     pomodoroPaused = true
   }
-
-  // Send pause notification
   notifyTimerPaused(currentWindow).catch(console.error)
 }
 
@@ -135,44 +199,44 @@ export function stopPomodoro() {
     clearInterval(pomodoroTimer)
     pomodoroTimer = null
   }
-  // Full reset
-  pomodoroSeconds = 0
-  pomodoroMode    = "work"
-  pomodoroPaused  = false
 
-  // Send stop notification
+  // Save partial work session if meaningful time elapsed
+  if (pomodoroMode === "work" && workSecondsElapsed >= 10) {
+    saveFocusSession("work", workSecondsElapsed)
+  }
+
+  // Full reset
+  pomodoroSeconds      = 0
+  pomodoroMode         = "work"
+  pomodoroPaused       = false
+  workSecondsElapsed   = 0
+
   notifyTimerStopped(currentWindow).catch(console.error)
 }
 
 /* ---------------- STOPWATCH ---------------- */
 
 export function startStopwatch(window?: BrowserWindow) {
-  // Store window reference
   currentWindow = window
 
-  // Resume from pause — keep elapsed seconds
   if (stopwatchPaused && !stopwatchTimer) {
     stopwatchPaused = false
     stopwatchTimer  = createStopwatchInterval()
     return
   }
 
-  // Already running — do nothing
   if (stopwatchTimer) return
 
-  // Fresh start
   stopwatchSeconds = 0
   stopwatchPaused  = false
   stopwatchTimer   = createStopwatchInterval()
 
-  // Send notification for stopwatch start
   notifyStopwatchStart(currentWindow).catch(console.error)
 }
 
 function createStopwatchInterval(): NodeJS.Timeout {
   return setInterval(() => {
     stopwatchSeconds++
-
     currentWindow?.webContents.send("timer:update", {
       seconds: stopwatchSeconds,
       mode:    "stopwatch" as any,
@@ -186,20 +250,19 @@ export function pauseStopwatch() {
     stopwatchTimer  = null
     stopwatchPaused = true
   }
-
-  // Send pause notification
   notifyTimerPaused(currentWindow).catch(console.error)
 }
 
 export function stopStopwatch() {
   if (stopwatchTimer) {
+    // Save stopwatch session
+    if (stopwatchSeconds >= 10) {
+      saveFocusSession("stopwatch", stopwatchSeconds)
+    }
     clearInterval(stopwatchTimer)
     stopwatchTimer = null
   }
-  // Full reset
   stopwatchSeconds = 0
   stopwatchPaused  = false
-
-  // Send stop notification
   notifyTimerStopped(currentWindow).catch(console.error)
 }

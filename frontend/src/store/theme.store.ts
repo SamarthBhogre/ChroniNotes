@@ -58,6 +58,8 @@ interface ThemeStore {
   setTheme: (id: ThemeId) => void
   perfMode: boolean
   setPerfMode: (on: boolean) => void
+  memorySaver: boolean
+  setMemorySaver: (on: boolean) => void
 }
 
 function applyTheme(id: ThemeId) {
@@ -65,17 +67,15 @@ function applyTheme(id: ThemeId) {
 }
 
 function applyPerfMode(on: boolean) {
-  if (on) {
-    document.documentElement.setAttribute("data-perf", "low")
-  } else {
-    document.documentElement.removeAttribute("data-perf")
-  }
+  if (on) document.documentElement.setAttribute("data-perf", "low")
+  else document.documentElement.removeAttribute("data-perf")
 }
 
-const savedTheme = (localStorage.getItem("chorniNotes-theme") as ThemeId) || "default"
-const savedPerf  = localStorage.getItem("chorniNotes-perf") === "true"
+const savedTheme       = (localStorage.getItem("chorniNotes-theme") as ThemeId) || "default"
+const savedPerf        = localStorage.getItem("chorniNotes-perf") === "true"
+const savedMemorySaver = localStorage.getItem("chorniNotes-memorySaver") === "true"
 
-// Apply both immediately on boot — before React renders
+// Apply immediately before React renders
 applyTheme(savedTheme)
 applyPerfMode(savedPerf)
 
@@ -86,10 +86,17 @@ export const useThemeStore = create<ThemeStore>((set) => ({
     applyTheme(id)
     set({ theme: id })
   },
+
   perfMode: savedPerf,
   setPerfMode: (on) => {
     localStorage.setItem("chorniNotes-perf", String(on))
     applyPerfMode(on)
     set({ perfMode: on })
+  },
+
+  memorySaver: savedMemorySaver,
+  setMemorySaver: (on) => {
+    localStorage.setItem("chorniNotes-memorySaver", String(on))
+    set({ memorySaver: on })
   },
 }))

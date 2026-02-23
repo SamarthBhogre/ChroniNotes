@@ -14,6 +14,7 @@ export function initDatabase() {
   db.pragma("journal_mode = WAL")
 
   createSchema()
+  runMigrations()
 }
 
 function createSchema() {
@@ -50,6 +51,23 @@ function createSchema() {
     (id, work_minutes, break_minutes)
     VALUES (1, 25, 5);
   `)
+}
+
+/* ── Migrations — safe to run on existing DBs ── */
+function runMigrations() {
+  // Add completed_at to tasks if it doesn't exist yet
+  // (ALTER TABLE ADD COLUMN is a no-op-safe pattern in SQLite)
+  const cols = db
+    .prepare("PRAGMA table_info(tasks)")
+    .all() as { name: string }[]
+
+  const hasCompletedAt = cols.some(c => c.name === "completed_at")
+  if (!hasCompletedAt) {
+    db.exec(`
+      ALTER TABLE tasks ADD COLUMN completed_at DATETIME DEFAULT NULL;
+    `)
+    console.log("[DB] Migration: added completed_at to tasks")
+  }
 }
 
 export function getDb() {
