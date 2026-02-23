@@ -5,14 +5,9 @@ import { app } from "electron"
 let db: Database.Database
 
 export function initDatabase() {
-  const dbPath = path.join(
-    app.getPath("userData"),
-    "chroninotes.db"
-  )
-
+  const dbPath = path.join(app.getPath("userData"), "chroninotes.db")
   db = new Database(dbPath)
   db.pragma("journal_mode = WAL")
-
   createSchema()
   runMigrations()
 }
@@ -47,32 +42,45 @@ function createSchema() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    INSERT OR IGNORE INTO pomodoro_settings
-    (id, work_minutes, break_minutes)
+    CREATE TABLE IF NOT EXISTS calendar_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'event',
+      date TEXT NOT NULL,
+      start_time TEXT,
+      end_time TEXT,
+      duration_minutes INTEGER,
+      color TEXT DEFAULT 'accent',
+      notes TEXT,
+      task_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+    );
+
+    INSERT OR IGNORE INTO pomodoro_settings (id, work_minutes, break_minutes)
     VALUES (1, 25, 5);
   `)
 }
 
-/* ── Migrations — safe to run on existing DBs ── */
 function runMigrations() {
-  // Add completed_at to tasks if it doesn't exist yet
-  // (ALTER TABLE ADD COLUMN is a no-op-safe pattern in SQLite)
-  const cols = db
+  const taskCols = db
     .prepare("PRAGMA table_info(tasks)")
     .all() as { name: string }[]
 
-  const hasCompletedAt = cols.some(c => c.name === "completed_at")
-  if (!hasCompletedAt) {
-    db.exec(`
-      ALTER TABLE tasks ADD COLUMN completed_at DATETIME DEFAULT NULL;
-    `)
+  const colNames = taskCols.map(c => c.name)
+
+  if (!colNames.includes("completed_at")) {
+    db.exec("ALTER TABLE tasks ADD COLUMN completed_at DATETIME DEFAULT NULL;")
     console.log("[DB] Migration: added completed_at to tasks")
+  }
+
+  if (!colNames.includes("due_date")) {
+    db.exec("ALTER TABLE tasks ADD COLUMN due_date TEXT DEFAULT NULL;")
+    console.log("[DB] Migration: added due_date to tasks")
   }
 }
 
 export function getDb() {
-  if (!db) {
-    throw new Error("Database not initialized")
-  }
+  if (!db) throw new Error("Database not initialized")
   return db
 }

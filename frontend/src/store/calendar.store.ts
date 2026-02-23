@@ -1,0 +1,133 @@
+import { create } from "zustand"
+
+export type EventType = "event" | "reminder" | "focus" | "task"
+
+export type CalendarEvent = {
+  id: number
+  title: string
+  type: EventType
+  date: string           // "YYYY-MM-DD"
+  start_time?: string | null
+  end_time?: string | null
+  duration_minutes?: number | null
+  color?: string | null
+  notes?: string | null
+  task_id?: number | null
+  created_at?: string
+}
+
+export type CalendarView = "month" | "week" | "day" | "agenda"
+
+export type ActiveDate = {
+  date: string
+  type: EventType
+}
+
+type CalendarStore = {
+  /* ── View state ── */
+  view: CalendarView
+  setView: (v: CalendarView) => void
+
+  /* ── Navigation ── */
+  currentDate: Date        // anchor date for current view
+  selectedDate: string     // "YYYY-MM-DD" — date clicked by user
+  setCurrentDate: (d: Date) => void
+  setSelectedDate: (d: string) => void
+  goToPrev: () => void
+  goToNext: () => void
+  goToToday: () => void
+
+  /* ── Events data ── */
+  events: CalendarEvent[]
+  activeDates: ActiveDate[]   // dates with events (for dot indicators)
+  loadEvents: (month: string) => Promise<void>
+  loadEventsByDate: (date: string) => Promise<CalendarEvent[]>
+  loadActiveDates: (month: string) => Promise<void>
+  createEvent: (event: Omit<CalendarEvent, "id" | "created_at">) => Promise<void>
+  updateEvent: (id: number, fields: Partial<CalendarEvent>) => Promise<void>
+  deleteEvent: (id: number) => Promise<void>
+}
+
+const todayStr = () => new Date().toISOString().split("T")[0]
+
+export const useCalendarStore = create<CalendarStore>((set, get) => ({
+  view: "month",
+  setView: (v) => set({ view: v }),
+
+  currentDate: new Date(),
+  selectedDate: todayStr(),
+  setCurrentDate: (d) => set({ currentDate: d }),
+  setSelectedDate: (d) => set({ selectedDate: d }),
+
+  goToPrev: () => {
+    const { view, currentDate } = get()
+    const d = new Date(currentDate)
+    if      (view === "month")  d.setMonth(d.getMonth() - 1)
+    else if (view === "week")   d.setDate(d.getDate() - 7)
+    else if (view === "day")    d.setDate(d.getDate() - 1)
+    else if (view === "agenda") d.setMonth(d.getMonth() - 1)
+    set({ currentDate: d })
+  },
+
+  goToNext: () => {
+    const { view, currentDate } = get()
+    const d = new Date(currentDate)
+    if      (view === "month")  d.setMonth(d.getMonth() + 1)
+    else if (view === "week")   d.setDate(d.getDate() + 7)
+    else if (view === "day")    d.setDate(d.getDate() + 1)
+    else if (view === "agenda") d.setMonth(d.getMonth() + 1)
+    set({ currentDate: d })
+  },
+
+  goToToday: () => {
+    set({ currentDate: new Date(), selectedDate: todayStr() })
+  },
+
+  events: [],
+  activeDates: [],
+
+  loadEvents: async (month) => {
+    const data = await window.electron.invoke("calendar:list", month)
+    set({ events: data })
+  },
+
+  loadEventsByDate: async (date) => {
+    return await window.electron.invoke("calendar:listByDate", date)
+  },
+
+  loadActiveDates: async (month) => {
+    const data = await window.electron.invoke("calendar:activeDates", month)
+    set({ activeDates: data })
+  },
+
+  createEvent: async (event) => {
+    await window.electron.invoke("calendar:create", event)
+    const month = event.date.slice(0, 7)
+    const [events, activeDates] = await Promise.all([
+      window.electron.invoke("calendar:list", month),
+      window.electron.invoke("calendar:activeDates", month),
+    ])
+    set({ events, activeDates })
+  },
+
+  updateEvent: async (id, fields) => {
+    await window.electron.invoke("calendar:update", { id, ...fields })
+    const month = (fields.date ?? get().events.find(e => e.id === id)?.date ?? todayStr()).slice(0, 7)
+    const [events, activeDates] = await Promise.all([
+      window.electron.invoke("calendar:list", month),
+      window.electron.invoke("calendar:activeDates", month),
+    ])
+    set({ events, activeDates })
+  },
+
+  deleteEvent: async (id) => {
+    const ev    = get().events.find(e => e.id === id)
+    const month = ev?.date?.slice(0, 7) ?? todayStr().slice(0, 7)
+    await window.electron.invoke("calendar:delete", id)
+    const [events, activeDates] = await Promise.all([
+      window.electron.invoke("calendar:list", month),
+      window.electron.invoke("calendar:activeDates", month),
+    ])
+    set({ events, activeDates })
+  },
+}))

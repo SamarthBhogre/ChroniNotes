@@ -6,7 +6,8 @@ export type Task = {
   id: number
   title: string
   status: TaskStatus
-  completed_at?: string | null   // ISO date string, set by backend when status → done
+  due_date?: string | null       // "YYYY-MM-DD" — shown on calendar
+  completed_at?: string | null   // ISO date string, set when status → done
   created_at?: string
 }
 
@@ -22,6 +23,7 @@ type TasksStore = {
   loadCompletionHistory: () => Promise<void>
   createTask: (title: string) => Promise<void>
   updateStatus: (id: number, status: TaskStatus) => Promise<void>
+  updateDueDate: (id: number, due_date: string | null) => Promise<void>
   deleteTask: (id: number) => Promise<void>
 }
 
@@ -32,13 +34,11 @@ export const useTasksStore = create<TasksStore>((set) => ({
   loadTasks: async () => {
     const data = await window.electron.invoke("tasks:list")
     set({ tasks: data })
-    console.log("[ZUSTAND] loadTasks executed")
   },
 
   loadCompletionHistory: async () => {
     const data = await window.electron.invoke("tasks:completionHistory")
     set({ completionHistory: data })
-    console.log("[ZUSTAND] loadCompletionHistory executed")
   },
 
   createTask: async (title) => {
@@ -46,7 +46,6 @@ export const useTasksStore = create<TasksStore>((set) => ({
     await window.electron.invoke("tasks:create", title)
     const data = await window.electron.invoke("tasks:list")
     set({ tasks: data })
-    console.log("[ZUSTAND] createTask executed")
   },
 
   updateStatus: async (id, status) => {
@@ -56,7 +55,12 @@ export const useTasksStore = create<TasksStore>((set) => ({
       window.electron.invoke("tasks:completionHistory"),
     ])
     set({ tasks, completionHistory: history })
-    console.log("[ZUSTAND] updateStatus executed")
+  },
+
+  updateDueDate: async (id, due_date) => {
+    await window.electron.invoke("tasks:updateDueDate", { id, due_date })
+    const data = await window.electron.invoke("tasks:list")
+    set({ tasks: data })
   },
 
   deleteTask: async (id) => {
@@ -66,6 +70,5 @@ export const useTasksStore = create<TasksStore>((set) => ({
       window.electron.invoke("tasks:completionHistory"),
     ])
     set({ tasks, completionHistory: history })
-    console.log("[ZUSTAND] deleteTask executed")
   },
 }))
