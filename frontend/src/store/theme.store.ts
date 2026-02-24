@@ -73,7 +73,7 @@ function applyPerfMode(on: boolean) {
 
 const savedTheme       = (localStorage.getItem("chorniNotes-theme") as ThemeId) || "default"
 const savedPerf        = localStorage.getItem("chorniNotes-perf") === "true"
-const savedMemorySaver = localStorage.getItem("chorniNotes-memorySaver") === "true"
+const savedMemorySaver = localStorage.getItem("chorniNotes-memorySaver") !== "false"  // default ON
 
 // Apply immediately before React renders
 applyTheme(savedTheme)

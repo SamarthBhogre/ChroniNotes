@@ -942,19 +942,9 @@ select option {
   background: var(--bg-surface) !important;
 }
 
-/* Kill orb animations entirely */
-[data-perf="low"] .bg-orb {
-  animation: none !important;
-  filter: none !important;
-  opacity: 0.06 !important;
-}
-
-/* Kill orb blur filters */
-[data-perf="low"] .bg-orb-1,
-[data-perf="low"] .bg-orb-2,
-[data-perf="low"] .bg-orb-3 {
-  filter: blur(20px) !important;
-  opacity: 0.05 !important;
+/* Kill orb animations entirely — fully hide in perf mode */
+[data-perf="low"] .bg-orbs {
+  display: none !important;
 }
 
 /* Kill topbar blur */

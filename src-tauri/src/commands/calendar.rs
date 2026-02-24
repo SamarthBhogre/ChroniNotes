@@ -16,6 +16,8 @@ pub struct CalendarEvent {
     pub color: Option<String>,
     pub notes: Option<String>,
     pub task_id: Option<i64>,
+    pub reminder_minutes: Option<i64>,
+    pub notified: Option<i64>,
     pub created_at: Option<String>,
 }
 
@@ -31,6 +33,7 @@ pub struct CreateEventPayload {
     pub color: Option<String>,
     pub notes: Option<String>,
     pub task_id: Option<i64>,
+    pub reminder_minutes: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +49,7 @@ pub struct UpdateEventPayload {
     pub color: Option<String>,
     pub notes: Option<String>,
     pub task_id: Option<i64>,
+    pub reminder_minutes: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,9 +78,13 @@ fn row_to_event(row: &rusqlite::Row) -> rusqlite::Result<CalendarEvent> {
         color: row.get(7)?,
         notes: row.get(8)?,
         task_id: row.get(9)?,
-        created_at: row.get(10)?,
+        reminder_minutes: row.get(10)?,
+        notified: row.get(11)?,
+        created_at: row.get(12)?,
     })
 }
+
+const SELECT_COLS: &str = "id, title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, reminder_minutes, notified, created_at";
 
 #[tauri::command]
 pub fn calendar_create(event: CreateEventPayload, db: State<Database>) -> Result<CalendarEvent, String> {
@@ -85,8 +93,8 @@ pub fn calendar_create(event: CreateEventPayload, db: State<Database>) -> Result
     let color = event.color.unwrap_or_else(|| "accent".to_string());
 
     conn.execute(
-        "INSERT INTO calendar_events (title, type, date, start_time, end_time, duration_minutes, color, notes, task_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO calendar_events (title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, reminder_minutes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             event.title,
             event_type,
@@ -97,14 +105,14 @@ pub fn calendar_create(event: CreateEventPayload, db: State<Database>) -> Result
             color,
             event.notes,
             event.task_id,
+            event.reminder_minutes,
         ],
     )
     .map_err(|e| e.to_string())?;
 
     let id = conn.last_insert_rowid();
-    let mut stmt = conn
-        .prepare("SELECT id, title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, created_at FROM calendar_events WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
+    let sql = format!("SELECT {} FROM calendar_events WHERE id = ?1", SELECT_COLS);
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     stmt.query_row(params![id], row_to_event)
         .map_err(|e| e.to_string())
 }
@@ -115,9 +123,8 @@ pub fn calendar_list(month: Option<String>, db: State<Database>) -> Result<Vec<C
     match month {
         Some(m) => {
             let pattern = format!("{}%", m);
-            let mut stmt = conn
-                .prepare("SELECT id, title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, created_at FROM calendar_events WHERE date LIKE ?1 ORDER BY date ASC, start_time ASC")
-                .map_err(|e| e.to_string())?;
+            let sql = format!("SELECT {} FROM calendar_events WHERE date LIKE ?1 ORDER BY date ASC, start_time ASC", SELECT_COLS);
+            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let rows = stmt
                 .query_map(params![pattern], row_to_event)
                 .map_err(|e| e.to_string())?
@@ -126,9 +133,8 @@ pub fn calendar_list(month: Option<String>, db: State<Database>) -> Result<Vec<C
             Ok(rows)
         }
         None => {
-            let mut stmt = conn
-                .prepare("SELECT id, title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, created_at FROM calendar_events ORDER BY date ASC, start_time ASC")
-                .map_err(|e| e.to_string())?;
+            let sql = format!("SELECT {} FROM calendar_events ORDER BY date ASC, start_time ASC", SELECT_COLS);
+            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let rows = stmt
                 .query_map([], row_to_event)
                 .map_err(|e| e.to_string())?
@@ -142,9 +148,8 @@ pub fn calendar_list(month: Option<String>, db: State<Database>) -> Result<Vec<C
 #[tauri::command]
 pub fn calendar_list_by_date(date: String, db: State<Database>) -> Result<Vec<CalendarEvent>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, created_at FROM calendar_events WHERE date = ?1 ORDER BY start_time ASC")
-        .map_err(|e| e.to_string())?;
+    let sql = format!("SELECT {} FROM calendar_events WHERE date = ?1 ORDER BY start_time ASC", SELECT_COLS);
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params![date], row_to_event)
         .map_err(|e| e.to_string())?
@@ -156,9 +161,8 @@ pub fn calendar_list_by_date(date: String, db: State<Database>) -> Result<Vec<Ca
 #[tauri::command]
 pub fn calendar_list_by_range(from: String, to: String, db: State<Database>) -> Result<Vec<CalendarEvent>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT id, title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, created_at FROM calendar_events WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC, start_time ASC")
-        .map_err(|e| e.to_string())?;
+    let sql = format!("SELECT {} FROM calendar_events WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC, start_time ASC", SELECT_COLS);
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params![from, to], row_to_event)
         .map_err(|e| e.to_string())?
@@ -186,10 +190,14 @@ pub fn calendar_update(payload: UpdateEventPayload, db: State<Database>) -> Resu
     if let Some(ref v) = payload.date {
         set_parts.push("date = ?".to_string());
         values.push(Box::new(v.clone()));
+        // Reset notified when date changes — event moved to a new day needs re-notification
+        set_parts.push("notified = 0".to_string());
     }
     if let Some(ref v) = payload.start_time {
         set_parts.push("start_time = ?".to_string());
         values.push(Box::new(v.clone()));
+        // Reset notified when time changes — rescheduled event needs re-notification
+        set_parts.push("notified = 0".to_string());
     }
     if let Some(ref v) = payload.end_time {
         set_parts.push("end_time = ?".to_string());
@@ -211,6 +219,12 @@ pub fn calendar_update(payload: UpdateEventPayload, db: State<Database>) -> Resu
         set_parts.push("task_id = ?".to_string());
         values.push(Box::new(v));
     }
+    if let Some(v) = payload.reminder_minutes {
+        set_parts.push("reminder_minutes = ?".to_string());
+        // Reset notified flag when reminder changes
+        set_parts.push("notified = 0".to_string());
+        values.push(Box::new(v));
+    }
 
     if set_parts.is_empty() {
         return Ok(None);
@@ -227,9 +241,8 @@ pub fn calendar_update(payload: UpdateEventPayload, db: State<Database>) -> Resu
         .map_err(|e| e.to_string())?;
 
     // Return updated event
-    let mut stmt = conn
-        .prepare("SELECT id, title, type, date, start_time, end_time, duration_minutes, color, notes, task_id, created_at FROM calendar_events WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
+    let select_sql = format!("SELECT {} FROM calendar_events WHERE id = ?1", SELECT_COLS);
+    let mut stmt = conn.prepare(&select_sql).map_err(|e| e.to_string())?;
     let event = stmt
         .query_row(params![payload.id], row_to_event)
         .ok();
@@ -264,4 +277,42 @@ pub fn calendar_active_dates(month: String, db: State<Database>) -> Result<Vec<A
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
+}
+
+/// Get events that are due for notification (reminder_minutes set, not yet notified, within time window).
+/// `local_today` must be the caller's LOCAL date as "YYYY-MM-DD" so we don't rely on SQLite's UTC `DATE('now')`.
+pub fn get_pending_notifications(db: &Database, local_today: &str) -> Result<Vec<CalendarEvent>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    // Use local date so time-zone offsets don't cause us to skip today's events.
+    // Match events where notified is 0 **or NULL** (migration default might be NULL for old rows).
+    let sql = format!(
+        "SELECT {} FROM calendar_events \
+         WHERE reminder_minutes IS NOT NULL \
+           AND (notified IS NULL OR notified = 0) \
+           AND start_time IS NOT NULL \
+           AND date >= DATE(?1, '-1 day') \
+           AND date <= DATE(?1, '+1 day')",
+        SELECT_COLS
+    );
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![local_today], row_to_event)
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(rows)
+}
+
+/// Mark an event as notified
+pub fn mark_notified(db: &Database, id: i64) {
+    if let Ok(conn) = db.conn.lock() {
+        let _ = conn.execute(
+            "UPDATE calendar_events SET notified = 1 WHERE id = ?1",
+            params![id],
+        );
+    }
 }

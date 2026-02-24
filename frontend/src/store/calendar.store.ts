@@ -13,6 +13,8 @@ export type CalendarEvent = {
   color?: string | null
   notes?: string | null
   task_id?: number | null
+  reminder_minutes?: number | null
+  notified?: number | null
   created_at?: string
 }
 

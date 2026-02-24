@@ -11,22 +11,22 @@ function useCardEntrance(_count: number) {
     refs.current.forEach((el, i) => {
       if (!el) return
       el.style.opacity = "0"
-      el.style.transform = "translateY(12px) scale(0.98)"
+      el.style.transform = "translateY(10px) scale(0.98)"
       setTimeout(() => {
-        el.style.transition = "opacity 0.3s ease, transform 0.3s cubic-bezier(0.22,1,0.36,1)"
+        el.style.transition = "opacity 0.25s ease, transform 0.25s cubic-bezier(0.22,1,0.36,1)"
         el.style.opacity = "1"
         el.style.transform = "translateY(0) scale(1)"
-      }, 80 + i * 55)
+      }, 60 + i * 45)
     })
   }, [])
   return refs
 }
 
 const CARDS = [
-  { icon: "◈", label: "Tasks",    desc: "Todos, progress & completions", glow: "var(--glow-a)", accent: "var(--accent)", rgb: "99,102,241",  page: "tasks"    as Page, statColor: "var(--color-blue)" },
-  { icon: "◉", label: "Notes",    desc: "Thoughts & writing",             glow: "var(--glow-b)", accent: "#a78bfa",       rgb: "139,92,246",  page: "notes"    as Page, statColor: "#a78bfa" },
-  { icon: "⊹", label: "Timer",    desc: "Pomodoro & focus sessions",      glow: "var(--glow-c)", accent: "#34d399",       rgb: "6,182,212",   page: "timer"    as Page, statColor: "#34d399" },
-  { icon: "▦", label: "Calendar", desc: "Events, reminders & schedule",   glow: "var(--glow-a)", accent: "#fb923c",       rgb: "251,146,60",  page: "calendar" as Page, statColor: "#fb923c" },
+  { icon: "◈", label: "Tasks",    desc: "Todos & progress",      rgb: "99,102,241",  page: "tasks"    as Page },
+  { icon: "◉", label: "Notes",    desc: "Thoughts & writing",    rgb: "139,92,246",  page: "notes"    as Page },
+  { icon: "⊹", label: "Timer",    desc: "Pomodoro & focus",      rgb: "6,182,212",   page: "timer"    as Page },
+  { icon: "▦", label: "Calendar", desc: "Events & reminders",    rgb: "251,146,60",  page: "calendar" as Page },
 ]
 
 interface Props { onNavigate?: (page: Page) => void }
@@ -47,7 +47,7 @@ function GoalRing({ completed, goal, size = 100 }: { completed: number; goal: nu
 }
 
 export default function Dashboard({ onNavigate }: Props) {
-  const cardRefs = useCardEntrance(CARDS.length)
+  const cardRefs = useCardEntrance(CARDS.length + 3)
 
   const [dataView, setDataView] = useState<DataView>(() =>
     (localStorage.getItem("chorniNotes-dataView") as DataView) ?? "tasks")
@@ -114,95 +114,112 @@ export default function Dashboard({ onNavigate }: Props) {
 
   return (
     <div style={{ height: "100%", color: "var(--text-primary)", overflowY: "auto" }}>
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "28px 40px 24px" }}>
+      <div style={{ maxWidth: "1060px", margin: "0 auto", padding: "20px 32px 24px" }}>
 
-        {/* ── Compact header ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-          <div>
-            <div className="inline-flex items-center gap-2" style={{ padding: "3px 10px", borderRadius: "20px", background: "var(--accent-dim)", border: "1px solid var(--accent-border)", fontSize: "10px", fontWeight: 600, color: "var(--accent)", letterSpacing: "0.3px", marginBottom: "6px" }}>
-              <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--color-green)", boxShadow: "0 0 6px var(--color-green)", display: "inline-block", animation: "pulse-glow 2s ease-in-out infinite" }} />
-              All systems active
+        {/* ── Header row ── */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{
+              width: "34px", height: "34px", borderRadius: "10px",
+              background: "var(--accent-dim)", border: "1px solid var(--accent-border)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "15px", color: "var(--accent)",
+            }}>⬡</div>
+            <div>
+              <h1 style={{ fontSize: "17px", fontWeight: 700, letterSpacing: "-0.3px", lineHeight: 1.2, margin: 0, color: "var(--text-primary)" }}>
+                Dashboard
+              </h1>
+              <div style={{ fontSize: "10px", color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: "5px", marginTop: "1px" }}>
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--color-green)", boxShadow: "0 0 4px var(--color-green)", display: "inline-block", animation: "pulse-glow 2s ease-in-out infinite" }} />
+                All systems active
+              </div>
             </div>
-            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, letterSpacing: "-0.4px", lineHeight: 1.1, background: "linear-gradient(135deg, var(--text-primary) 40%, var(--accent))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              Dashboard
-            </h1>
           </div>
+
           {/* Data view toggle */}
-          <div style={{ display: "flex", padding: "3px", borderRadius: "var(--radius-lg)", background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}>
+          <div style={{ display: "flex", padding: "3px", borderRadius: "10px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}>
             {(["tasks", "pomodoro"] as DataView[]).map(v => (
               <button key={v} onClick={() => switchView(v)} style={{
-                padding: "4px 14px", borderRadius: "var(--radius-md)", fontSize: "11px", fontWeight: 600,
+                padding: "5px 12px", borderRadius: "7px", fontSize: "11px", fontWeight: 600,
                 color: dataView === v ? "var(--text-primary)" : "var(--text-tertiary)",
                 background: dataView === v ? "var(--glass-bg-hover)" : "transparent",
                 border: `1px solid ${dataView === v ? "var(--glass-border-strong)" : "transparent"}`,
-                cursor: "pointer", transition: "all 0.2s ease",
-                display: "flex", alignItems: "center", gap: "5px",
+                cursor: "pointer", transition: "all 0.15s ease",
+                display: "flex", alignItems: "center", gap: "4px",
               }}>
-                {v === "tasks" ? "◈" : "⊹"} {v === "tasks" ? "Tasks" : "Pomodoro"}
+                {v === "tasks" ? "◈" : "⊹"} {v === "tasks" ? "Tasks" : "Focus"}
               </button>
             ))}
           </div>
         </div>
 
-        {/* ── Row 1: 4 Nav Cards ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "14px" }}>
-          {CARDS.map(({ icon, label, desc, glow, accent, rgb, page, statColor }, i) => (
+        {/* ── Row 1: Nav Cards (compact) ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", marginBottom: "12px" }}>
+          {CARDS.map(({ icon, label, desc, rgb, page }, i) => (
             <div key={label} ref={el => { cardRefs.current[i] = el }} className="glass"
               onClick={() => onNavigate?.(page)}
-              style={{ borderRadius: "var(--radius-xl)", padding: "16px 18px", position: "relative", overflow: "hidden", cursor: onNavigate ? "pointer" : "default", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" }}
-              onMouseEnter={e => { if (!onNavigate) return; const el = e.currentTarget; el.style.background = "var(--glass-bg-hover)"; el.style.borderColor = `rgba(${rgb},0.25)`; el.style.transform = "translateY(-3px) scale(1.01)"; el.style.boxShadow = `0 8px 24px rgba(${rgb},0.15)` }}
-              onMouseLeave={e => { const el = e.currentTarget; el.style.background = "var(--glass-bg)"; el.style.borderColor = "var(--glass-border)"; el.style.transform = "translateY(0) scale(1)"; el.style.boxShadow = "var(--glass-shadow)" }}
+              style={{
+                borderRadius: "12px", padding: "14px 16px",
+                position: "relative", overflow: "hidden",
+                cursor: onNavigate ? "pointer" : "default",
+                transition: "all 0.18s cubic-bezier(0.34,1.56,0.64,1)",
+              }}
+              onMouseEnter={e => { if (!onNavigate) return; const el = e.currentTarget; el.style.background = "var(--glass-bg-hover)"; el.style.borderColor = `rgba(${rgb},0.25)`; el.style.transform = "translateY(-2px)"; el.style.boxShadow = `0 6px 20px rgba(${rgb},0.12)` }}
+              onMouseLeave={e => { const el = e.currentTarget; el.style.background = "var(--glass-bg)"; el.style.borderColor = "var(--glass-border)"; el.style.transform = "translateY(0)"; el.style.boxShadow = "var(--glass-shadow)" }}
             >
-              <div style={{ position: "absolute", top: "-30px", right: "-30px", width: "90px", height: "90px", borderRadius: "50%", background: glow, opacity: 0.1, filter: "blur(20px)", pointerEvents: "none" }} />
-              <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: `rgba(${rgb},0.14)`, border: `1px solid rgba(${rgb},0.28)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", color: accent, marginBottom: "10px" }}>{icon}</div>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "3px" }}>{label}</div>
-              <div style={{ fontSize: "10px", color: "var(--text-tertiary)", lineHeight: 1.4, marginBottom: "12px" }}>{desc}</div>
+              <div style={{ position: "absolute", top: "-25px", right: "-25px", width: "70px", height: "70px", borderRadius: "50%", background: `rgba(${rgb},0.08)`, filter: "blur(15px)", pointerEvents: "none" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.24)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", color: `rgba(${rgb},1)`, flexShrink: 0 }}>{icon}</div>
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>{label}</div>
+                  <div style={{ fontSize: "9px", color: "var(--text-tertiary)", lineHeight: 1.3 }}>{desc}</div>
+                </div>
+              </div>
               <button onClick={e => { e.stopPropagation(); onNavigate?.(page) }}
-                style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 10px", borderRadius: "20px", background: `rgba(${rgb},0.10)`, border: `1px solid rgba(${rgb},0.20)`, fontSize: "10px", fontWeight: 700, color: statColor, cursor: "pointer", transition: "all 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = `rgba(${rgb},0.20)` }}
-                onMouseLeave={e => { e.currentTarget.style.background = `rgba(${rgb},0.10)` }}>
-                <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: statColor, display: "inline-block" }} />
-                Open <span style={{ opacity: 0.6 }}>→</span>
+                style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 8px", borderRadius: "6px", background: `rgba(${rgb},0.08)`, border: `1px solid rgba(${rgb},0.18)`, fontSize: "9px", fontWeight: 700, color: `rgba(${rgb},1)`, cursor: "pointer", transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = `rgba(${rgb},0.16)` }}
+                onMouseLeave={e => { e.currentTarget.style.background = `rgba(${rgb},0.08)` }}>
+                Open <span style={{ opacity: 0.5 }}>→</span>
               </button>
             </div>
           ))}
         </div>
 
         {/* ── Row 2: Progress Ring + Streak ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
 
           {/* Daily Progress Ring */}
-          <div className="glass" style={{ borderRadius: "var(--radius-xl)", padding: "16px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+          <div ref={el => { cardRefs.current[4] = el }} className="glass" style={{ borderRadius: "12px", padding: "14px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
               <div>
-                <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.6px", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Daily Progress</div>
+                <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Daily Progress</div>
                 <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginTop: "1px" }}>{isPomodoro ? "Focus Minutes" : "Task Completions"}</div>
               </div>
-              <button onClick={openEditGoal} style={{ width: "24px", height: "24px", borderRadius: "6px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", cursor: "pointer" }}
+              <button onClick={openEditGoal} style={{ width: "22px", height: "22px", borderRadius: "6px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", cursor: "pointer" }}
                 onMouseEnter={e => { e.currentTarget.style.color = "var(--accent)" }}
                 onMouseLeave={e => { e.currentTarget.style.color = "var(--text-tertiary)" }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <div style={{ position: "relative", flexShrink: 0 }}>
-                <GoalRing completed={activeCompleted} goal={activeGoal} size={100} />
+                <GoalRing completed={activeCompleted} goal={activeGoal} size={90} />
                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                   {editingGoal ? (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
                       <input type="number" value={goalInput} min={1} onChange={e => setGoalInput(+e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveGoal(); if (e.key === "Escape") setEditingGoal(false) }} autoFocus
-                        style={{ width: "46px", textAlign: "center", fontSize: "13px", fontWeight: 700, background: "var(--glass-bg)", border: "1px solid var(--accent-border)", borderRadius: "5px", color: "var(--text-primary)", padding: "2px 0" }} />
-                      <button onClick={saveGoal} style={{ fontSize: "8px", fontWeight: 600, color: "var(--accent)", background: "var(--accent-dim)", border: "1px solid var(--accent-border)", borderRadius: "3px", padding: "1px 5px", cursor: "pointer" }}>Save</button>
+                        style={{ width: "42px", textAlign: "center", fontSize: "12px", fontWeight: 700, background: "var(--glass-bg)", border: "1px solid var(--accent-border)", borderRadius: "5px", color: "var(--text-primary)", padding: "2px 0" }} />
+                      <button onClick={saveGoal} style={{ fontSize: "8px", fontWeight: 600, color: "var(--accent)", background: "var(--accent-dim)", border: "1px solid var(--accent-border)", borderRadius: "3px", padding: "1px 5px", cursor: "pointer" }}>Set</button>
                     </div>
                   ) : (
                     <>
-                      <span style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1, color: "var(--text-primary)" }}>{activeCompleted}</span>
+                      <span style={{ fontSize: "18px", fontWeight: 700, lineHeight: 1, color: "var(--text-primary)" }}>{activeCompleted}</span>
                       <span style={{ fontSize: "8px", color: "var(--text-tertiary)", marginTop: "1px" }}>of {activeGoal} {activeUnit}</span>
                     </>
                   )}
                 </div>
               </div>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "7px" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
                 <MiniStat label="Yesterday" value={`${activeYesterday}`} unit={activeUnit} />
                 <div style={{ height: "1px", background: "var(--glass-border)" }} />
                 <MiniStat label="Goal" value={`${activeGoal}`} unit={activeGoalUnit} accent />
@@ -210,34 +227,32 @@ export default function Dashboard({ onNavigate }: Props) {
                 <MiniStat label="Progress" value={activeGoal > 0 ? `${Math.round((activeCompleted / activeGoal) * 100)}%` : "0%"} unit="" accent={activeCompleted >= activeGoal && activeGoal > 0} />
               </div>
             </div>
-            <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px solid var(--glass-border)", textAlign: "center" }}>
-              <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                {isPomodoro ? "Today's focus: " : "Completed today: "}
-                <span style={{ color: "var(--accent)", fontWeight: 600 }}>{activeCompleted} {activeUnit}</span>
-                {activeCompleted >= activeGoal && activeGoal > 0 && activeCompleted > 0 && " 🎉"}
-              </span>
-            </div>
+            {activeCompleted >= activeGoal && activeGoal > 0 && activeCompleted > 0 && (
+              <div style={{ marginTop: "8px", paddingTop: "6px", borderTop: "1px solid var(--glass-border)", textAlign: "center", fontSize: "10px", color: "var(--accent)", fontWeight: 600 }}>
+                🎉 Daily goal reached!
+              </div>
+            )}
           </div>
 
           {/* Streak + breakdown */}
-          <div className="glass" style={{ borderRadius: "var(--radius-xl)", padding: "16px 20px" }}>
-            <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.6px", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Overview</div>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "10px", marginTop: "1px" }}>{isPomodoro ? "Focus Stats" : "Task Stats"}</div>
+          <div ref={el => { cardRefs.current[5] = el }} className="glass" style={{ borderRadius: "12px", padding: "14px 18px" }}>
+            <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Overview</div>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px", marginTop: "1px" }}>{isPomodoro ? "Focus Stats" : "Task Stats"}</div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "var(--radius-lg)", background: activeStreak > 0 ? "var(--accent-dim)" : "var(--glass-bg)", border: `1px solid ${activeStreak > 0 ? "var(--accent-border)" : "var(--glass-border)"}`, marginBottom: "10px" }}>
-              <div style={{ fontSize: "22px", lineHeight: 1 }}>{activeStreak >= 7 ? "🔥" : activeStreak >= 3 ? "⚡" : activeStreak > 0 ? "✦" : "○"}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "10px", background: activeStreak > 0 ? "var(--accent-dim)" : "var(--glass-bg)", border: `1px solid ${activeStreak > 0 ? "var(--accent-border)" : "var(--glass-border)"}`, marginBottom: "8px" }}>
+              <div style={{ fontSize: "20px", lineHeight: 1 }}>{activeStreak >= 7 ? "🔥" : activeStreak >= 3 ? "⚡" : activeStreak > 0 ? "✦" : "○"}</div>
               <div>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: activeStreak > 0 ? "var(--accent)" : "var(--text-secondary)", lineHeight: 1 }}>
-                  {activeStreak}<span style={{ fontSize: "11px", fontWeight: 500, color: "var(--text-tertiary)", marginLeft: "3px" }}>day{activeStreak !== 1 ? "s" : ""}</span>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: activeStreak > 0 ? "var(--accent)" : "var(--text-secondary)", lineHeight: 1 }}>
+                  {activeStreak}<span style={{ fontSize: "10px", fontWeight: 500, color: "var(--text-tertiary)", marginLeft: "2px" }}>day{activeStreak !== 1 ? "s" : ""}</span>
                 </div>
                 <div style={{ fontSize: "9px", color: "var(--text-tertiary)", marginTop: "1px" }}>
-                  {activeStreak === 0 ? "Start your streak" : activeStreak >= 7 ? "You're on fire! 🔥" : "Current streak"}
+                  {activeStreak === 0 ? "Start your streak" : activeStreak >= 7 ? "On fire! 🔥" : "Current streak"}
                 </div>
               </div>
             </div>
 
             {isPomodoro ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                 <MiniStat label="Sessions today" value={`${focusHistory.find(d => d.date === todayStr)?.count ?? 0}`} unit="sessions" />
                 <div style={{ height: "1px", background: "var(--glass-border)" }} />
                 <MiniStat label="Focus today" value={`${todayMinutes}`} unit="min" accent />
@@ -245,14 +260,14 @@ export default function Dashboard({ onNavigate }: Props) {
                 <MiniStat label="Total sessions" value={`${focusHistory.reduce((s, d) => s + d.count, 0)}`} unit="all time" />
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                 {[
                   { label: "To do", count: todoTasks, color: "var(--text-tertiary)", bar: "var(--glass-border-strong)" },
                   { label: "In progress", count: doingTasks, color: "var(--color-yellow)", bar: "var(--color-yellow)" },
                   { label: "Done", count: doneTasks, color: "var(--color-green)", bar: "var(--color-green)" },
                 ].map(({ label, count, color, bar }) => (
                   <div key={label}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
                       <span style={{ fontSize: "10px", color: "var(--text-secondary)" }}>{label}</span>
                       <span style={{ fontSize: "10px", fontWeight: 600, color }}>{count}</span>
                     </div>
@@ -266,14 +281,18 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </div>
 
-        {/* ── Row 3: Mini Calendar + Heatmap side by side ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "12px" }}>
-          <CalendarMiniWidget onNavigate={() => onNavigate?.("calendar")} />
-          <ActivityHeatmap
-            history={activeHistory}
-            weeks={20}
-            label={isPomodoro ? "Pomodoro Session Heatmap" : "Task Completion Heatmap"}
-          />
+        {/* ── Row 3: Mini Calendar + Heatmap ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "10px" }}>
+          <div ref={el => { cardRefs.current[6] = el }}>
+            <CalendarMiniWidget onNavigate={() => onNavigate?.("calendar")} />
+          </div>
+          <div ref={el => { cardRefs.current[7] = el }}>
+            <ActivityHeatmap
+              history={activeHistory}
+              weeks={20}
+              label={isPomodoro ? "Focus Session Heatmap" : "Task Completion Heatmap"}
+            />
+          </div>
         </div>
 
       </div>

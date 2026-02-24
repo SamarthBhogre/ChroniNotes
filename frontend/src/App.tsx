@@ -1,8 +1,9 @@
-import { lazy, Suspense, useState } from "react"
+import { lazy, Suspense, useEffect, useCallback, useState } from "react"
 import Topbar from "./components/layout/Topbar"
 import Sidebar from "./components/layout/Sidebar"
 import WelcomeScreen from "./components/WelcomeScreen"
 import Settings from "./pages/Settings"
+import About from "./pages/About"
 import { useThemeStore } from "./store/theme.store"
 
 import "./store/theme.store"
@@ -31,11 +32,12 @@ export default function App() {
   const [page, setPage]                 = useState<Page>("dashboard")
   const [showWelcome, setShowWelcome]   = useState(true)
   const [showSettings, setShowSettings] = useState(false)
+  const [showAbout, setShowAbout]       = useState(false)
   const { memorySaver } = useThemeStore()
 
   const [visited, setVisited] = useState<Set<Page>>(new Set<Page>(["dashboard"]))
 
-  const navigate = (target: Page) => {
+  const navigate = useCallback((target: Page) => {
     setPage(target)
     setVisited(prev => {
       if (prev.has(target)) return prev
@@ -43,7 +45,28 @@ export default function App() {
       next.add(target)
       return next
     })
-  }
+  }, [])
+
+  /* ── Global keyboard shortcuts ── */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ctrl+, → Settings
+      if (e.ctrlKey && e.key === ",") {
+        e.preventDefault()
+        setShowSettings(prev => !prev)
+        setShowAbout(false)
+        return
+      }
+
+      // Escape → close modals
+      if (e.key === "Escape") {
+        if (showSettings) { setShowSettings(false); e.preventDefault(); return }
+        if (showAbout)    { setShowAbout(false);    e.preventDefault(); return }
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [showSettings, showAbout])
 
   return (
     <div className="flex h-screen overflow-hidden"
@@ -51,8 +74,12 @@ export default function App() {
 
       {showWelcome && <WelcomeScreen onFinished={() => setShowWelcome(false)} />}
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      {showAbout && <About onClose={() => setShowAbout(false)} />}
 
-      <Topbar onOpenSettings={() => setShowSettings(true)} />
+      <Topbar
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenAbout={() => setShowAbout(true)}
+      />
 
       {!showWelcome && (
         <div className="bg-orbs">

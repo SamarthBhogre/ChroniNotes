@@ -1,10 +1,17 @@
 mod db;
 mod commands;
+mod notifications;
 
 use tauri::Manager;
 use db::Database;
 use commands::timer::TimerState;
 use commands::notes::NotesRoot;
+
+/// SAFETY: Database is stored in Tauri managed state with 'static lifetime.
+/// We use a raw pointer cast to pass it to the background notification thread.
+fn get_static_ref<T>(state: &T) -> &'static T {
+    unsafe { &*(state as *const T) }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,14 +19,16 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
-            // Set up logging in debug mode
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // Set up logging — always enabled so notification diagnostics are visible
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(if cfg!(debug_assertions) {
+                        log::LevelFilter::Debug
+                    } else {
+                        log::LevelFilter::Info
+                    })
+                    .build(),
+            )?;
 
             // Resolve app data directory
             let app_data_dir = app
@@ -38,6 +47,10 @@ pub fn run() {
             // Initialize timer state
             let timer_state = TimerState::new();
             app.manage(timer_state);
+
+            // Start notification scheduler for calendar reminders
+            let db_ref = get_static_ref(app.state::<Database>().inner());
+            notifications::spawn_notification_scheduler(app.handle().clone(), db_ref);
 
             Ok(())
         })

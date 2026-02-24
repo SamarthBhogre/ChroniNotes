@@ -1,6 +1,6 @@
 [package]
 name = "chroninotes"
-version = "1.0.0"
+version = "2.0.0"
 description = "Offline-first desktop productivity assistant for students"
 authors = ["Samarth Bhogre"]
 license = "MIT"
@@ -31,3 +31,6 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+[profile.dev]
+opt-level = 0
