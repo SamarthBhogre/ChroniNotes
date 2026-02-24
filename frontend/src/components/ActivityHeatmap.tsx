@@ -43,7 +43,7 @@ function buildGrid(history: DayActivity[], weeks: number) {
 }
 
 /* ── Month labels ── */
-function getMonthLabels(grid: ReturnType<typeof buildGrid>["grid"], weeks: number) {
+function getMonthLabels(grid: ReturnType<typeof buildGrid>["grid"], _weeks: number) {
   const labels: { label: string; col: number }[] = []
   let lastMonth = -1
   for (let w = 0; w < grid.length; w++) {
@@ -57,7 +57,7 @@ function getMonthLabels(grid: ReturnType<typeof buildGrid>["grid"], weeks: numbe
 }
 
 /* ── Color intensity based on count ── */
-function getCellColor(count: number, isFuture: boolean, isToday: boolean) {
+function getCellColor(count: number, isFuture: boolean, _isToday: boolean) {
   if (isFuture) return "var(--glass-bg)"
   if (count === 0) return "var(--glass-border-strong)"
   if (count === 1) return "var(--heatmap-1, rgba(99,102,241,0.25))"
@@ -71,7 +71,7 @@ const CELL = 12
 const GAP  = 3
 
 export default function ActivityHeatmap({ history, weeks = 26, label = "Task Completion Heatmap" }: Props) {
-  const { grid, startDay } = buildGrid(history, weeks)
+  const { grid } = buildGrid(history, weeks)
   const monthLabels = getMonthLabels(grid, weeks)
   const totalWidth  = weeks * (CELL + GAP) - GAP
 
@@ -79,7 +79,6 @@ export default function ActivityHeatmap({ history, weeks = 26, label = "Task Com
   const totalCompleted = history.reduce((s, d) => s + d.count, 0)
 
   // Current streak — count consecutive days backwards from today with count > 0
-  const today = new Date().toISOString().split("T")[0]
   const map = new Map(history.map(d => [d.date, d.count]))
   let streak = 0
   const cur = new Date()

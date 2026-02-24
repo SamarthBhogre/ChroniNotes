@@ -16,7 +16,7 @@ const NAV_ITEMS: { id: Page; label: string; icon: string }[] = [
   { id: "calendar",  label: "Calendar",  icon: "▦" },
 ]
 
-function useNavEntrance(count: number) {
+function useNavEntrance(_count: number) {
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   useEffect(() => {
     refs.current.forEach((el, i) => {

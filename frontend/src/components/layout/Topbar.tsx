@@ -19,6 +19,7 @@ export default function Topbar({ title = "ChorniNotes", onOpenSettings }: Topbar
   return (
     <div
       className="topbar"
+      data-tauri-drag-region
       style={{
         position: "fixed", top: 0, left: 0, right: 0, height: "40px",
         zIndex: 1000, display: "flex", alignItems: "center",
@@ -28,7 +29,6 @@ export default function Topbar({ title = "ChorniNotes", onOpenSettings }: Topbar
         borderBottom: "1px solid var(--glass-border)",
         backdropFilter: "var(--glass-blur)",
         WebkitBackdropFilter: "var(--glass-blur)",
-        WebkitAppRegion: "drag" as any,
         transition: "background 0.4s ease",
       }}
     >
@@ -38,7 +38,7 @@ export default function Topbar({ title = "ChorniNotes", onOpenSettings }: Topbar
         color: "var(--text-primary)", fontSize: "var(--font-size-sm)", fontWeight: 600,
       }}>
         {/* Menu button */}
-        <div style={{ position: "relative", WebkitAppRegion: "no-drag" as any }}>
+        <div style={{ position: "relative" }}>
           <button
             onClick={() => setShowMenu(!showMenu)}
             aria-label="Menu"
@@ -147,7 +147,6 @@ export default function Topbar({ title = "ChorniNotes", onOpenSettings }: Topbar
       {/* Right side — window controls */}
       <div style={{
         display: "flex", alignItems: "center",
-        WebkitAppRegion: "no-drag" as any,
       }}>
         <button onClick={handleMinimize} className="window-control-btn" aria-label="Minimize">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">

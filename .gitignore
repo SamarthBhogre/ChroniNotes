@@ -1,13 +1,44 @@
 # Node dependencies
 node_modules/
 
-# Electron build artifacts
+# Build artifacts
 dist/
 build/
 
+# Tauri build artifacts
+src-tauri/target/
+
+# Tauri generated schemas (auto-generated, not needed in repo)
+src-tauri/gen/schemas/
+
 # Environment files
 .env
+.env.*
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
+pnpm-debug.log*
+
+# IDE / Editor
+.vs/
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Pi agent
+.pi/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp scripts
+*.bat
+!run-tauri-dev.bat
+!run-tauri-build.bat
+!setup.bat

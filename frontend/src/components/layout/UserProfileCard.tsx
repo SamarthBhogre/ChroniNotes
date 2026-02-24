@@ -43,7 +43,7 @@ export default function UserProfileCard() {
   const nameRef = useRef<HTMLInputElement>(null)
 
   const [editing, setEditing] = useState(false)
-  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const [, setShowStatusMenu] = useState(false)
   const [showProfilePopup, setShowProfilePopup] = useState(false)
   const [draftName, setDraftName] = useState(name)
 

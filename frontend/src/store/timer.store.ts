@@ -99,7 +99,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 /* ═══════════════════════════════════
    CLIENT-SIDE TIMER (no backend)
 ═══════════════════════════════════ */
-let clientTimerInterval: NodeJS.Timeout | null = null
+let clientTimerInterval: ReturnType<typeof setInterval> | null = null
 
 function startClientTimer() {
   if (clientTimerInterval) return
