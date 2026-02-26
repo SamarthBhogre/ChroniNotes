@@ -61,7 +61,7 @@ export default function UpdateChecker() {
     }
   }, [state, manualCheck])
 
-  const checkForUpdate = useCallback(async (manual: boolean) => {
+  const checkForUpdate = useCallback(async (_manual?: boolean) => {
     setState("checking")
     setError("")
     try {
@@ -464,9 +464,4 @@ function DetailRow({ label, value, accent }: { label: string; value: string; acc
       }}>{value}</span>
     </div>
   )
-}
-
-function formatSize(bytes: number) {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
