@@ -1,6 +1,7 @@
 mod db;
 mod commands;
 mod notifications;
+mod updater;
 
 use tauri::Manager;
 use db::Database;
@@ -75,6 +76,7 @@ pub fn run() {
             commands::timer::focus_history,
             commands::timer::focus_today_minutes,
             commands::timer::focus_yesterday_minutes,
+            commands::timer::timer_notify,
             // Notes
             commands::notes::notes_list,
             commands::notes::notes_get,
@@ -98,6 +100,9 @@ pub fn run() {
             commands::calendar::calendar_update,
             commands::calendar::calendar_delete,
             commands::calendar::calendar_active_dates,
+            // Updater
+            updater::updater_check,
+            updater::updater_download_and_install,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

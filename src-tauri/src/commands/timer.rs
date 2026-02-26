@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use rusqlite::params;
 use std::sync::Mutex;
 use tauri::{Emitter, State, AppHandle};
+use tauri_plugin_notification::NotificationExt;
 use crate::db::Database;
 
 /* ── Types ── */
@@ -218,10 +219,30 @@ fn spawn_pomodoro_loop(app: AppHandle, db: &'static Database, timer: &'static Ti
                 if current_mode == "work" {
                     *mode = "break".to_string();
                     *seconds = settings.break_minutes * 60;
+
+                    // Send notification: work session complete
+                    let _ = app.notification()
+                        .builder()
+                        .title("🎯 Focus Session Complete")
+                        .body(&format!(
+                            "Great work! Take a {}-minute break.",
+                            settings.break_minutes
+                        ))
+                        .show();
                 } else {
                     *mode = "work".to_string();
                     *seconds = settings.work_minutes * 60;
                     *work_elapsed = 0;
+
+                    // Send notification: break over
+                    let _ = app.notification()
+                        .builder()
+                        .title("⏰ Break Over")
+                        .body(&format!(
+                            "Break's over! Starting a {}-minute focus session.",
+                            settings.work_minutes
+                        ))
+                        .show();
                 }
             }
         }
@@ -337,6 +358,17 @@ pub fn stopwatch_stop(db: State<Database>, timer: State<TimerState>) -> Result<(
 }
 
 /* ── Focus History Commands ── */
+
+#[tauri::command]
+pub fn timer_notify(app: AppHandle, title: String, body: String) -> Result<(), String> {
+    app.notification()
+        .builder()
+        .title(&title)
+        .body(&body)
+        .show()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
 
 #[tauri::command]
 pub fn focus_history(db: State<Database>) -> Result<Vec<FocusDay>, String> {

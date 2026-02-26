@@ -4,7 +4,7 @@ interface AboutProps {
   onClose: () => void
 }
 
-const APP_VERSION = "2.0.0"
+const APP_VERSION = "2.1.0"
 const BUILD_YEAR  = "2026"
 
 /* ── All keyboard shortcuts / commands ── */
@@ -67,7 +67,7 @@ const FEATURES = [
   { icon: "▦", title: "Calendar", desc: "Month, week, day, and agenda views. Create events with type-coding (event, reminder, focus, task) and desktop notification reminders." },
   { icon: "🔔", title: "Reminders", desc: "Configurable desktop notifications for calendar events — 5 min, 15 min, 1 hour, or custom intervals before the event." },
   { icon: "🎨", title: "5 Themes", desc: "Midnight Indigo, Steel Blue, Warm Linen, Ember, and Carbon — each with its own accent palette, glass effects, and background orbs." },
-  { icon: "⚡", title: "Performance Mode", desc: "Disable blur, animations, and GPU effects for low-end hardware. Memory Saver unmounts inactive pages to free RAM." },
+  { icon: "⚡", title: "Optimized", desc: "Performance-first design with solid backgrounds, no heavy blur or GPU effects. Memory Saver unmounts inactive pages to free RAM." },
   { icon: "💾", title: "Offline-First", desc: "All data stored locally in SQLite — no cloud, no accounts, no internet required. Your notes and tasks never leave your machine." },
 ]
 

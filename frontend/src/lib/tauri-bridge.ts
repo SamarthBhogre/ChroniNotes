@@ -36,6 +36,9 @@ const channelMap: Record<string, (payload?: any) => Promise<any>> = {
   "stopwatch:pause":         ()      => invoke("stopwatch_pause"),
   "stopwatch:stop":          ()      => invoke("stopwatch_stop"),
 
+  // ── Timer notifications ──
+  "timer:notify":            (p)     => invoke("timer_notify", { title: p.title, body: p.body }),
+
   // ── Focus history ──
   "focus:history":           ()      => invoke("focus_history"),
   "focus:todayMinutes":      ()      => invoke("focus_today_minutes"),
@@ -71,12 +74,21 @@ const channelMap: Record<string, (payload?: any) => Promise<any>> = {
   "window-minimize": () => getCurrentWindow().minimize(),
   "window-maximize": () => getCurrentWindow().toggleMaximize(),
   "window-close":    () => getCurrentWindow().close(),
+
+  // ── Updater ──
+  "updater:check":             ()  => invoke("updater_check"),
+  "updater:downloadAndInstall": (p) => invoke("updater_download_and_install", { downloadUrl: p.download_url, installerName: p.installer_name }),
 }
 
 // Event listeners (for timer:update from backend)
 const eventListeners: Record<string, (listener: (...args: any[]) => void) => void> = {
   "timer:update": (listener) => {
     listen<any>("timer:update", (event) => {
+      listener(event.payload)
+    })
+  },
+  "updater:progress": (listener) => {
+    listen<any>("updater:progress", (event) => {
       listener(event.payload)
     })
   },

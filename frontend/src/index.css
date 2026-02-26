@@ -924,9 +924,8 @@ select option {
 }
 
 /* ═══════════════════════════════════════════════
-   PERFORMANCE MODE — [data-perf="low"]
-   Applied to <html> when user enables perf mode.
-   Kills all expensive GPU/CPU effects:
+   PERFORMANCE OPTIMIZATIONS — ALWAYS ACTIVE
+   All expensive GPU/CPU effects are disabled:
    - backdrop-filter (biggest GPU cost)
    - background orb animations
    - blur filters on orbs
@@ -935,68 +934,57 @@ select option {
 ═══════════════════════════════════════════════ */
 
 /* Kill backdrop-filter on all glass elements */
-[data-perf="low"] .glass,
-[data-perf="low"] .glass-hover {
+.glass,
+.glass-hover {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background: var(--bg-surface) !important;
 }
 
-/* Kill orb animations entirely — fully hide in perf mode */
-[data-perf="low"] .bg-orbs {
+/* Kill orb animations entirely */
+.bg-orbs {
   display: none !important;
 }
 
 /* Kill topbar blur */
-[data-perf="low"] .topbar {
+.topbar {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background: var(--bg-surface) !important;
 }
 
 /* Kill all inline backdrop-filter on modals/dropdowns */
-[data-perf="low"] * {
+[style*="backdropFilter"],
+[style*="backdrop-filter"] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
 /* Remove box-shadow glows (GPU composited) */
-[data-perf="low"] .glass {
+.glass {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 /* Disable glass-hover lift animation */
-[data-perf="low"] .glass-hover:hover {
+.glass-hover:hover {
   transform: none !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 /* Kill page enter animation */
-[data-perf="low"] .page-enter {
+.page-enter {
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
 }
 
-/* Kill pulse-glow animation */
-[data-perf="low"] * {
-  animation-duration: 0.001ms !important;
-}
-
-/* Re-allow critical functional animations only */
-[data-perf="low"] .ws-progress-fill {
+/* Re-allow critical functional animations (progress bars, timer digits) */
+.ws-progress-fill {
   transition: width 0.3s ease !important;
 }
 
-/* Solid backgrounds for modals on perf mode */
-[data-perf="low"] [style*="backdropFilter"],
-[data-perf="low"] [style*="backdrop-filter"] {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
 /* Ember + Warm Linen light theme perf scrollbar */
-[data-theme="ember"][data-perf="low"] ::-webkit-scrollbar-thumb,
-[data-theme="warm-linen"][data-perf="low"] ::-webkit-scrollbar-thumb {
+[data-theme="ember"] ::-webkit-scrollbar-thumb,
+[data-theme="warm-linen"] ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.20);
 }

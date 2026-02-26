@@ -120,12 +120,13 @@ function startClientTimer() {
       stopClientTimer()
       useTimerStore.setState({ isRunning: false, isPaused: false })
       
-      // Optional: Play notification sound or show alert
-      if (typeof window !== "undefined" && "Notification" in window) {
-        new Notification("Timer Complete", {
+      // Send notification via Tauri bridge
+      try {
+        window.electron.invoke("timer:notify", {
+          title: "⏱️ Timer Complete",
           body: "Your custom timer has finished!",
         })
-      }
+      } catch (_) {}
     }
   }, 1000)
 }

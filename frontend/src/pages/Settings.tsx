@@ -28,8 +28,8 @@ function ToggleSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   )
 }
 
-/* ── Reusable perf row ── */
-function PerfRow({
+/* ── Reusable setting row ── */
+function SettingRow({
   icon, title, description, active, onToggle,
 }: {
   icon: React.ReactNode
@@ -73,7 +73,7 @@ function PerfRow({
 }
 
 export default function Settings({ onClose }: SettingsProps) {
-  const { theme, setTheme, perfMode, setPerfMode, memorySaver, setMemorySaver } = useThemeStore()
+  const { theme, setTheme, memorySaver, setMemorySaver } = useThemeStore()
 
   return (
     <div
@@ -81,7 +81,6 @@ export default function Settings({ onClose }: SettingsProps) {
       style={{
         position: "fixed", inset: 0, zIndex: 2000,
         background: "rgba(0,0,0,0.55)",
-        backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         animation: "pageEnter 0.2s ease",
       }}
@@ -94,8 +93,6 @@ export default function Settings({ onClose }: SettingsProps) {
           borderRadius: "var(--radius-xl)",
           background: "var(--modal-bg, rgba(12,15,30,0.97))",
           border: "1px solid var(--glass-border-strong)",
-          backdropFilter: "blur(32px) saturate(180%)",
-          WebkitBackdropFilter: "blur(32px) saturate(180%)",
           boxShadow: "0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)",
           animation: "settingsEnter 0.22s cubic-bezier(0.34,1.56,0.64,1)",
         }}
@@ -113,7 +110,7 @@ export default function Settings({ onClose }: SettingsProps) {
             <h2 style={{
               fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.3px",
               color: "var(--text-primary)", margin: 0,
-            }}>Appearance & Performance</h2>
+            }}>Appearance & Memory</h2>
           </div>
           <button
             onClick={onClose}
@@ -201,43 +198,13 @@ export default function Settings({ onClose }: SettingsProps) {
 
           <Divider />
 
-          {/* ══ PERFORMANCE SECTION ══ */}
-          <SectionLabel>Performance</SectionLabel>
+          {/* ══ MEMORY SECTION ══ */}
+          <SectionLabel>Memory</SectionLabel>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
 
-            {/* Performance Mode */}
-            <PerfRow
-              active={perfMode}
-              onToggle={() => setPerfMode(!perfMode)}
-              title="Performance Mode"
-              description={perfMode ? "Animations & blur effects disabled" : "Reduces blur, animations & GPU effects"}
-              icon={
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke={perfMode ? "var(--accent)" : "var(--text-secondary)"}
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-              }
-            />
-
-            {/* Expanded detail when perf mode on */}
-            {perfMode && (
-              <div style={{
-                padding: "10px 14px", borderRadius: "var(--radius-md)",
-                background: "var(--glass-bg)", border: "1px solid var(--glass-border)",
-                animation: "pageEnter 0.2s ease",
-              }}>
-                <p style={{ fontSize: "11px", color: "var(--text-tertiary)", lineHeight: 1.6, margin: 0 }}>
-                  <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>Disabled: </span>
-                  backdrop blur, background orb animations, ambient glow effects, CSS filters.
-                  Solid backgrounds are used instead — ideal for low-end or integrated GPU systems.
-                </p>
-              </div>
-            )}
-
             {/* Memory Saver */}
-            <PerfRow
+            <SettingRow
               active={memorySaver}
               onToggle={() => setMemorySaver(!memorySaver)}
               title="Memory Saver"
@@ -269,8 +236,8 @@ export default function Settings({ onClose }: SettingsProps) {
               </div>
             )}
 
-            {/* Combined savings badge */}
-            {(perfMode || memorySaver) && (
+            {/* Status badge */}
+            {memorySaver && (
               <div style={{
                 display: "flex", alignItems: "center", gap: "8px",
                 padding: "10px 14px", borderRadius: "var(--radius-md)",
@@ -284,11 +251,62 @@ export default function Settings({ onClose }: SettingsProps) {
                   flexShrink: 0,
                 }} />
                 <span style={{ fontSize: "11px", color: "var(--accent)", fontWeight: 600 }}>
-                  {[perfMode && "GPU optimised", memorySaver && "Memory saver active"]
-                    .filter(Boolean).join(" · ")}
+                  Memory saver active
                 </span>
               </div>
             )}
+          </div>
+
+          <Divider />
+
+          {/* ══ UPDATES SECTION ══ */}
+          <SectionLabel>Updates</SectionLabel>
+
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: "16px", padding: "14px 16px", borderRadius: "var(--radius-lg)",
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
+              <div style={{
+                width: "34px", height: "34px", borderRadius: "8px", flexShrink: 0,
+                background: "var(--glass-bg-hover)",
+                border: "1px solid var(--glass-border)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </div>
+              <div>
+                <div style={{
+                  fontSize: "13px", fontWeight: 600,
+                  color: "var(--text-primary)", marginBottom: "2px",
+                }}>Check for Updates</div>
+                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+                  See if a newer version is available on GitHub
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => window.dispatchEvent(new Event("check-for-updates"))}
+              style={{
+                padding: "7px 16px", borderRadius: "var(--radius-md)",
+                fontSize: "11px", fontWeight: 600, flexShrink: 0,
+                background: "var(--accent-dim)",
+                border: "1px solid var(--accent-border)",
+                color: "var(--accent)", cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "var(--accent-border)" }}
+              onMouseLeave={e => { e.currentTarget.style.background = "var(--accent-dim)" }}
+            >
+              Check Now
+            </button>
           </div>
 
           <Divider />
@@ -309,7 +327,6 @@ export default function Settings({ onClose }: SettingsProps) {
               <span style={{ color: "var(--accent)", fontWeight: 600 }}>
                 {THEMES.find(t => t.id === theme)?.name}
               </span>
-              {perfMode && <Badge label="PERF" />}
               {memorySaver && <Badge label="MEM" />}
             </span>
           </div>

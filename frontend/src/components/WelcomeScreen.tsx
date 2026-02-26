@@ -176,14 +176,12 @@ const welcomeStyles = `
   background: var(--bg-base);
   overflow: hidden;
   transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.7s cubic-bezier(0.4, 0, 0.2, 1),
-              filter 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+              transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ws-exit {
   opacity: 0;
   transform: scale(1.06);
-  filter: blur(6px);
   pointer-events: none;
 }
 
@@ -196,14 +194,7 @@ const welcomeStyles = `
 .ws-gradient {
   position: absolute;
   border-radius: 50%;
-  filter: blur(120px);
-  animation: wsGradientDrift 30s ease-in-out infinite alternate;
-}
-
-@keyframes wsGradientDrift {
-  0%   { transform: translate(0, 0) scale(1); }
-  50%  { transform: translate(20px, 15px) scale(1.05); }
-  100% { transform: translate(40px, 30px) scale(1.12); }
+  opacity: 0.25;
 }
 
 .ws-gradient-1 {
@@ -211,14 +202,12 @@ const welcomeStyles = `
   background: radial-gradient(circle, var(--glow-a), transparent 70%);
   opacity: 0.35;
   top: -15%; left: -10%;
-  animation-delay: 0s;
 }
 .ws-gradient-2 {
   width: 550px; height: 550px;
   background: radial-gradient(circle, var(--glow-b), transparent 70%);
   opacity: 0.28;
   bottom: -15%; right: -5%;
-  animation-delay: 0s;
 }
 .ws-gradient-3 {
   width: 380px; height: 380px;
@@ -226,7 +215,6 @@ const welcomeStyles = `
   opacity: 0.22;
   top: 50%; left: 55%;
   transform: translate(-50%, -50%);
-  animation-delay: 0s;
 }
 
 .ws-spotlight {
@@ -313,7 +301,7 @@ const welcomeStyles = `
   margin: 0;
 }
 
-/* ── Fade transitions ── */
+/* ── Fade transitions — use transitions instead of animations for perf ── */
 .ws-fade-in {
   animation: wsFadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -322,12 +310,12 @@ const welcomeStyles = `
 }
 
 @keyframes wsFadeIn {
-  from { opacity: 0; transform: translateY(20px) scale(0.96); filter: blur(4px); }
-  to   { opacity: 1; transform: translateY(0) scale(1);       filter: blur(0px); }
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes wsFadeOut {
-  from { opacity: 1; transform: translateY(0) scale(1);        filter: blur(0px); }
-  to   { opacity: 0; transform: translateY(-16px) scale(0.96); filter: blur(4px); }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-16px) scale(0.96); }
 }
 
 /* ── Loading dots ── */
@@ -374,6 +362,7 @@ const welcomeStyles = `
   box-shadow: 0 0 14px var(--accent-glow);
   position: relative;
   will-change: width;
+  transition: width 0.3s ease;
 }
 
 .ws-progress-fill::after {

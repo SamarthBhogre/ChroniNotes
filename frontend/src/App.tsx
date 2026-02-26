@@ -4,6 +4,7 @@ import Sidebar from "./components/layout/Sidebar"
 import WelcomeScreen from "./components/WelcomeScreen"
 import Settings from "./pages/Settings"
 import About from "./pages/About"
+import UpdateChecker from "./components/UpdateChecker"
 import { useThemeStore } from "./store/theme.store"
 
 import "./store/theme.store"
@@ -75,19 +76,12 @@ export default function App() {
       {showWelcome && <WelcomeScreen onFinished={() => setShowWelcome(false)} />}
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
       {showAbout && <About onClose={() => setShowAbout(false)} />}
+      {!showWelcome && <UpdateChecker />}
 
       <Topbar
         onOpenSettings={() => setShowSettings(true)}
         onOpenAbout={() => setShowAbout(true)}
       />
-
-      {!showWelcome && (
-        <div className="bg-orbs">
-          <div className="bg-orb bg-orb-1" />
-          <div className="bg-orb bg-orb-2" />
-          <div className="bg-orb bg-orb-3" />
-        </div>
-      )}
 
       <Sidebar current={page} onChange={navigate} />
 
