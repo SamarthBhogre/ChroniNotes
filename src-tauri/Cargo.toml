@@ -1,6 +1,6 @@
 [package]
 name = "chroninotes"
-version = "2.1.1"
+version = "2.1.2"
 description = "Offline-first desktop productivity assistant for students"
 authors = ["Samarth Bhogre"]
 license = "MIT"
@@ -26,6 +26,9 @@ tauri-plugin-notification = "2"
 tauri-plugin-shell = "2"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 tempfile = "3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
 panic = "abort"

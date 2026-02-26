@@ -206,10 +206,45 @@ pub async fn updater_download_and_install(
         downloaded
     );
 
-    // Launch the installer
-    std::process::Command::new(&installer_path)
-        .spawn()
-        .map_err(|e| format!("Failed to launch installer: {}", e))?;
+    // Launch the installer with elevated privileges (UAC prompt)
+    // Using ShellExecuteW with "runas" verb so the user gets a UAC prompt
+    // instead of requiring the entire app to run as administrator.
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use std::ffi::OsStr;
+
+        let operation: Vec<u16> = OsStr::new("runas").encode_wide().chain(std::iter::once(0)).collect();
+        let file: Vec<u16> = OsStr::new(&installer_path).encode_wide().chain(std::iter::once(0)).collect();
+        let parameters: Vec<u16> = OsStr::new("").encode_wide().chain(std::iter::once(0)).collect();
+        let directory: Vec<u16> = OsStr::new(&temp_dir).encode_wide().chain(std::iter::once(0)).collect();
+
+        let result = unsafe {
+            windows_sys::Win32::UI::Shell::ShellExecuteW(
+                std::ptr::null_mut(),
+                operation.as_ptr(),
+                file.as_ptr(),
+                parameters.as_ptr(),
+                directory.as_ptr(),
+                windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+            )
+        };
+
+        // ShellExecuteW returns a value > 32 on success
+        if (result as isize) <= 32 {
+            return Err(format!(
+                "Failed to launch installer with elevation (ShellExecute returned {})",
+                result as isize
+            ));
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new(&installer_path)
+            .spawn()
+            .map_err(|e| format!("Failed to launch installer: {}", e))?;
+    }
 
     log::info!("[Updater] Installer launched. Closing app...");
 

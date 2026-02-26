@@ -540,7 +540,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chroninotes"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "chrono",
  "log",
@@ -554,6 +554,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-shell",
  "tempfile",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
