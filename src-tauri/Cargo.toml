@@ -1,6 +1,6 @@
 [package]
 name = "chroninotes"
-version = "2.1.0"
+version = "2.1.1"
 description = "Offline-first desktop productivity assistant for students"
 authors = ["Samarth Bhogre"]
 license = "MIT"

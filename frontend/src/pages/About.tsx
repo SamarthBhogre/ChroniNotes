@@ -4,7 +4,7 @@ interface AboutProps {
   onClose: () => void
 }
 
-const APP_VERSION = "2.1.0"
+const APP_VERSION = "2.1.1"
 const BUILD_YEAR  = "2026"
 
 /* ── All keyboard shortcuts / commands ── */
@@ -249,7 +249,7 @@ export default function About({ onClose }: AboutProps) {
                 <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--accent)", marginBottom: "4px" }}>Made by</div>
                 <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>Samarth Bhogre</div>
                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                  Semester 6 Project · © {BUILD_YEAR}
+                  Software Developer · © {BUILD_YEAR}
                 </div>
               </div>
 
