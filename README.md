@@ -18,10 +18,19 @@ ChroniNotes combines them so context stays together:
 
 - Task management with `todo`, `doing`, and `done` workflow.
 - Rich notes editor with folders/pages and auto-save.
-- Pomodoro + stopwatch + custom timer modes.
-- Calendar with events, reminders, and task due dates.
+- Pomodoro + stopwatch + custom timer modes with session logging.
+- Calendar with events, reminders, and task due dates (month, week, day, and agenda views).
 - Syntax-highlighted code blocks in notes with language selection.
 - Focus session history with heatmap visualization.
+- Contribution streaks across task completions and focus sessions.
+- Daily goal tracking with configurable targets for tasks and focus minutes.
+- Desktop notification reminders for calendar events with configurable intervals.
+- User profile with name, avatar, and status indicator (Learning / Working / Idle).
+- Five built-in themes: Midnight Indigo, Steel Blue, Warm Linen, Ember, and Carbon.
+- Memory saver mode that unmounts inactive pages to reduce RAM usage.
+- In-app update checker with one-click download and install from GitHub Releases.
+- Custom frameless window with integrated title bar controls.
+- Windows 11-style welcome screen on first launch.
 - Local file + SQLite persistence.
 
 ## Tech Stack
@@ -29,14 +38,15 @@ ChroniNotes combines them so context stays together:
 | Layer | Used | How It Is Used | Why It Is Used |
 |---|---|---|---|
 | Desktop shell | **Tauri v2** | Rust backend + WebView2 frontend with IPC bridge | Lightweight native shell (~5.8 MB binary, ~26 MB RAM) |
-| Backend | **Rust** | Handles all IPC commands, database, file I/O, timers | Memory-safe, fast, no runtime overhead |
+| Backend | **Rust** | Handles all IPC commands, database, file I/O, timers, notifications, updater | Memory-safe, fast, no runtime overhead |
 | Frontend | React 19 + TypeScript | SPA renderer for Dashboard/Tasks/Notes/Timer/Calendar | Fast UI development with type safety |
 | Build tool | Vite | Dev server + frontend build pipeline | Fast HMR and modern bundling |
-| State | Zustand | Lightweight stores for tasks/notes/timer/calendar | Simple, predictable state updates |
+| State | Zustand | Lightweight stores for tasks/notes/timer/calendar/theme/user | Simple, predictable state updates |
 | Notes editor | TipTap | Rich text editor extensions and commands | Highly extensible editor model |
 | Code highlighting | lowlight + TipTap code block extension | Syntax colors in note code blocks | Good language highlighting inside notes |
 | Database | **rusqlite** (SQLite) | Stores tasks, calendar events, timer settings, focus sessions, presets | Fast local persistence, no external service |
 | Notes storage | JSON files in app data folder | Each note/folder stored as real files | Easy backup, portability, transparency |
+| Notifications | tauri-plugin-notification | Desktop reminders for calendar events and timer completions | Native OS notifications without polling |
 | Styling | Tailwind CSS + custom CSS vars | Layout + theming + component styling | Rapid UI iteration with consistent theme |
 
 ## Architecture
@@ -48,20 +58,22 @@ ChorniNotes/
 │   │   ├── lib.rs       ← App setup, plugin registration, command wiring
 │   │   ├── main.rs      ← Entry point
 │   │   ├── db.rs        ← SQLite schema, migrations, WAL mode
+│   │   ├── updater.rs   ← GitHub release checker, installer download
+│   │   ├── notifications.rs ← Background scheduler for calendar reminders
 │   │   └── commands/    ← IPC command handlers
 │   │       ├── tasks.rs          ← Task CRUD, completion history, due dates
 │   │       ├── timer.rs          ← Pomodoro, stopwatch, focus sessions
 │   │       ├── notes.rs          ← File-based notes system (JSON files)
 │   │       ├── timer_presets.rs  ← Timer preset CRUD
-│   │       └── calendar.rs       ← Calendar events CRUD, date queries
+│   │       └── calendar.rs       ← Calendar events CRUD, date queries, reminders
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── frontend/            ← React SPA
 │   ├── src/
 │   │   ├── lib/tauri-bridge.ts   ← IPC compatibility bridge
-│   │   ├── store/                ← Zustand stores
-│   │   ├── pages/                ← Dashboard, Tasks, Notes, Timer, Calendar
-│   │   └── components/           ← UI components
+│   │   ├── store/                ← Zustand stores (tasks, notes, timer, calendar, theme, user)
+│   │   ├── pages/                ← Dashboard, Tasks, Notes, Timer, Calendar, Settings, About
+│   │   └── components/           ← UI components (heatmap, editor, sidebar, topbar, updater, welcome)
 │   └── package.json
 └── package.json         ← Root scripts (dev, build)
 ```
@@ -161,6 +173,7 @@ Produces:
 |---|---|
 | Tasks, calendar events, timer settings, focus sessions, presets | SQLite (`chroninotes.db`) in app data directory |
 | Notes and folders | JSON files under `ChroniNotes/` in app data directory |
+| User profile and preferences | LocalStorage in WebView2 |
 
 App data location (Windows):
 ```
@@ -177,7 +190,7 @@ C:\Users\<you>\AppData\Roaming\com.chroninotes.app\
 | Total app RAM | ~150–350 MB (includes WebView2 renderer) |
 | Cold startup | ~2s |
 
-The Rust backend itself is very lean. The bulk of memory usage comes from WebView2 (Microsoft Edge's renderer engine), which is an inherent cost of any webview-based desktop framework.
+The Rust backend itself is very lean. The bulk of memory usage comes from WebView2 (Microsoft Edge's renderer engine), which is an inherent cost of any webview-based desktop framework. Memory saver mode can reduce frontend RAM by unmounting inactive pages.
 
 ## Troubleshooting
 
@@ -212,11 +225,12 @@ Fix: Tauri dev mode has hot reload for frontend. For Rust changes, the app auto-
 ## Future Scope
 
 - Core scheduling engine for study blocks and task calendar planning
-- Contribution streak system across timer sessions and task completion
-- Advanced analytics (focus trends, task velocity, note activity heatmaps)
-- Goal-based planning with milestones and review cycles
+- Advanced analytics with focus trend graphs, task velocity charts, and productivity reports
+- Goal-based planning with milestones, review cycles, and progress tracking
 - Cross-device sync as optional encrypted mode
 - Smart insights and reminders based on behavior patterns
+- Plugin or extension system for custom workflows
+- Export and import of notes, tasks, and calendar data
 
 ## Contributing
 
