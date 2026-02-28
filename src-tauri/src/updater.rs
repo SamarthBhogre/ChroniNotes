@@ -44,8 +44,13 @@ pub struct DownloadProgress {
 const GITHUB_REPO: &str = "SamarthBhogre/ChroniNotes";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The only host we will ever download from.
-const ALLOWED_DOWNLOAD_HOST: &str = "objects.githubusercontent.com";
+/// GitHub release asset URLs use github.com as the host and redirect to the
+/// CDN at objects.githubusercontent.com at the HTTP level.  The URL returned
+/// by the GitHub API's browser_download_url field always has this form:
+///   https://github.com/<owner>/<repo>/releases/download/<tag>/<file>
+const ALLOWED_DOWNLOAD_HOST: &str = "github.com";
+const ALLOWED_DOWNLOAD_PATH_PREFIX: &str =
+    "/SamarthBhogre/ChroniNotes/releases/download/";
 
 // ─── Version helpers ─────────────────────────────────────────────────────────
 
@@ -73,15 +78,14 @@ fn is_newer(current: &str, latest: &str) -> bool {
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
 
-/// Reject any download URL that doesn't come from GitHub's release asset CDN.
+/// Reject any download URL that doesn't come from this repo's GitHub releases.
 ///
 /// GitHub asset URLs look like:
-///   https://objects.githubusercontent.com/github-production-release-asset-…
+///   https://github.com/SamarthBhogre/ChroniNotes/releases/download/<tag>/<file>
 ///
-/// We never execute a URL supplied raw by the frontend — the frontend can only
-/// trigger a download for a URL we already fetched from the GitHub API (stored
-/// in `UpdateInfo`).  This second check is defence-in-depth in case something
-/// passes through an unexpected code path.
+/// We check both the host and the path prefix so we never follow a URL that
+/// wasn't issued by this repo's release page, even if something unexpected
+/// reaches this code path.
 fn validate_download_url(url: &str) -> Result<(), String> {
     let parsed = url::Url::parse(url).map_err(|_| "Invalid download URL".to_string())?;
 
@@ -94,6 +98,12 @@ fn validate_download_url(url: &str) -> Result<(), String> {
         return Err(format!(
             "Download URL host '{}' is not the expected GitHub asset host",
             host
+        ));
+    }
+
+    if !parsed.path().starts_with(ALLOWED_DOWNLOAD_PATH_PREFIX) {
+        return Err(format!(
+            "Download URL path does not match expected release asset path for this repo"
         ));
     }
 
