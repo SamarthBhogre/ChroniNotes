@@ -27,12 +27,12 @@ function buildGrid(history: DayActivity[], weeks: number) {
     for (let d = 0; d < 7; d++) {
       const cell = new Date(startDay)
       cell.setDate(startDay.getDate() + w * 7 + d)
-      const dateStr = cell.toISOString().split("T")[0]
+      const dateStr = `${cell.getFullYear()}-${String(cell.getMonth() + 1).padStart(2, "0")}-${String(cell.getDate()).padStart(2, "0")}`
       const isFuture = cell > today
       week.push({
         date: dateStr,
         count: isFuture ? 0 : (map.get(dateStr) ?? 0),
-        isToday: dateStr === today.toISOString().split("T")[0],
+        isToday: dateStr === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
         isFuture,
       })
     }
@@ -83,7 +83,7 @@ export default function ActivityHeatmap({ history, weeks = 26, label = "Task Com
   let streak = 0
   const cur = new Date()
   while (true) {
-    const d = cur.toISOString().split("T")[0]
+    const d = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`
     if ((map.get(d) ?? 0) > 0) {
       streak++
       cur.setDate(cur.getDate() - 1)

@@ -28,8 +28,11 @@ const REMINDER_OPTIONS = [
 ]
 
 /* ── Helpers ── */
+// Use local date components instead of toISOString() which returns UTC.
+// At 00:33 IST (UTC+5:30) toISOString() would still show the previous UTC
+// date, causing the "today" highlight to point to yesterday.
 function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0]
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`

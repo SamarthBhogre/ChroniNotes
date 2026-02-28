@@ -50,7 +50,13 @@ type CalendarStore = {
   deleteEvent: (id: number) => Promise<void>
 }
 
-const todayStr = () => new Date().toISOString().split("T")[0]
+// Use local date components instead of toISOString() which returns UTC.
+// At e.g. 00:33 IST (UTC+5:30) toISOString() would still return the
+// previous UTC date, making "today" point to yesterday.
+const todayStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
 
 export const useCalendarStore = create<CalendarStore>((set, get) => ({
   view: "month",

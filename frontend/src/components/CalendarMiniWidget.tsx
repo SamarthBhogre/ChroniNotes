@@ -15,9 +15,13 @@ interface Props {
 export default function CalendarMiniWidget({ onNavigate }: Props) {
   const { activeDates, loadActiveDates } = useCalendarStore()
 
-  const today     = new Date()
-  const [year, setYear]   = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
+  // Compute today fresh on every render so the highlight always tracks the
+  // real current date even when the app is left open past midnight.
+  const now       = new Date()
+  const todayStr  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+
+  const [year, setYear]   = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth())
 
   const mk = `${year}-${String(month + 1).padStart(2, "0")}`
 
@@ -27,9 +31,7 @@ export default function CalendarMiniWidget({ onNavigate }: Props) {
   const startDay   = new Date(year, month, 1).getDay()
   const totalCells = Math.ceil((startDay + totalDays) / 7) * 7
 
-  const todayStr = today.toISOString().split("T")[0]
-
-  // Build a map of date → types for dot rendering
+  // Build a map of date -> types for dot rendering
   const dotMap = activeDates.reduce<Record<string, Set<string>>>((acc, d) => {
     if (!acc[d.date]) acc[d.date] = new Set()
     acc[d.date].add(d.type)

@@ -86,16 +86,16 @@ export default function Dashboard({ onNavigate }: Props) {
     setEditingGoal(false)
   }
 
-  const todayStr = new Date().toISOString().split("T")[0]
+  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` })()
   const yd = new Date(); yd.setDate(yd.getDate() - 1)
   const todayTasksDone     = completionHistory.find(d => d.date === todayStr)?.count ?? 0
-  const yesterdayTasksDone = completionHistory.find(d => d.date === yd.toISOString().split("T")[0])?.count ?? 0
+  const yesterdayTasksDone = completionHistory.find(d => d.date === `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, "0")}-${String(yd.getDate()).padStart(2, "0")}`)?.count ?? 0
 
   function calcStreak(history: { date: string; count: number }[]) {
     const map = new Map(history.map(d => [d.date, d.count]))
     let streak = 0, cur = new Date()
     while (true) {
-      const d = cur.toISOString().split("T")[0]
+      const d = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`
       if ((map.get(d) ?? 0) > 0) { streak++; cur.setDate(cur.getDate() - 1) } else break
     }
     return streak
