@@ -67,6 +67,82 @@ impl NotesRoot {
     }
 }
 
+/* ── Path security ── */
+
+/// Resolve `user_path` relative to `root` and verify the canonical result
+/// is still inside `root`.
+///
+/// Rejects:
+///  - absolute paths   (`/etc/passwd`, `C:\Windows\...`)
+///  - traversal tokens (`..`, `../sibling`)
+///  - anything that canonicalises outside `root`
+///
+/// Returns the canonical `PathBuf` on success so callers never have to
+/// call `join` themselves.
+pub fn safe_resolve(root: &Path, user_path: &str) -> Result<PathBuf, String> {
+    // 1. Reject obviously absolute paths before we even join.
+    let probe = Path::new(user_path);
+    if probe.is_absolute() {
+        return Err(format!("Path must be relative, got: {user_path}"));
+    }
+
+    // 2. Reject any component that is a `..` traversal.
+    //    We check the *string* components before joining so we never touch
+    //    the filesystem for the validation step.
+    for component in probe.components() {
+        use std::path::Component;
+        match component {
+            Component::ParentDir => {
+                return Err(format!("Path traversal not allowed: {user_path}"));
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                return Err(format!("Absolute path component in: {user_path}"));
+            }
+            _ => {}
+        }
+    }
+
+    // 3. Build the candidate absolute path.
+    let candidate = root.join(user_path);
+
+    // 4. Canonical check: resolve symlinks and normalise `.` components.
+    //    If the path does not yet exist we walk up to the first existing
+    //    ancestor and check that instead — this covers create operations
+    //    where the leaf does not exist yet.
+    let canonical_root = fs::canonicalize(root)
+        .map_err(|e| format!("Cannot canonicalise notes root: {e}"))?;
+
+    let canonical_candidate = if candidate.exists() {
+        fs::canonicalize(&candidate)
+            .map_err(|e| format!("Cannot canonicalise path: {e}"))?
+    } else {
+        // Walk up until we find an ancestor that exists.
+        let mut check = candidate.as_path();
+        loop {
+            if check.exists() {
+                let canon = fs::canonicalize(check)
+                    .map_err(|e| format!("Cannot canonicalise ancestor: {e}"))?;
+                // Re-attach the non-existent suffix.
+                let suffix = candidate.strip_prefix(check)
+                    .map_err(|_| "Strip prefix failed".to_string())?;
+                break canon.join(suffix);
+            }
+            match check.parent() {
+                Some(p) => check = p,
+                None => return Err("No existing ancestor found for path".to_string()),
+            }
+        }
+    };
+
+    if !canonical_candidate.starts_with(&canonical_root) {
+        return Err(format!(
+            "Path escapes notes root: {user_path}"
+        ));
+    }
+
+    Ok(canonical_candidate)
+}
+
 /* ── Helpers ── */
 
 fn slugify(text: &str) -> String {
@@ -173,22 +249,10 @@ fn scan_dir(dir: &Path, root: &Path) -> Vec<NoteEntry> {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string();
-            let title = meta
-                .as_ref()
-                .map(|m| m.title.clone())
-                .unwrap_or_else(|| dir_name.clone());
-            let icon = meta
-                .as_ref()
-                .map(|m| m.icon.clone())
-                .unwrap_or_else(|| "◈".to_string());
-            let created = meta
-                .as_ref()
-                .map(|m| m.created_at.clone())
-                .unwrap_or_else(|| now_iso());
-            let updated = meta
-                .as_ref()
-                .map(|m| m.updated_at.clone())
-                .unwrap_or_else(|| now_iso());
+            let title   = meta.as_ref().map(|m| m.title.clone()).unwrap_or_else(|| dir_name.clone());
+            let icon    = meta.as_ref().map(|m| m.icon.clone()).unwrap_or_else(|| "◈".to_string());
+            let created = meta.as_ref().map(|m| m.created_at.clone()).unwrap_or_else(now_iso);
+            let updated = meta.as_ref().map(|m| m.updated_at.clone()).unwrap_or_else(now_iso);
 
             entries.push(NoteEntry {
                 id: id.clone(),
@@ -202,7 +266,6 @@ fn scan_dir(dir: &Path, root: &Path) -> Vec<NoteEntry> {
                 updated_at: updated,
             });
 
-            // Recurse
             entries.extend(scan_dir(&full_path, root));
         } else if full_path.is_file() {
             let file_name = full_path
@@ -213,7 +276,7 @@ fn scan_dir(dir: &Path, root: &Path) -> Vec<NoteEntry> {
 
             if file_name.ends_with(NOTE_EXT) && file_name != FOLDER_META {
                 if let Ok(data) = read_note_file(&full_path) {
-                    let id = rel_id(&full_path, root);
+                    let id   = rel_id(&full_path, root);
                     let name = if data.title.is_empty() {
                         file_name.trim_end_matches(NOTE_EXT).to_string()
                     } else {
@@ -224,11 +287,7 @@ fn scan_dir(dir: &Path, root: &Path) -> Vec<NoteEntry> {
                         id: id.clone(),
                         name: name.clone(),
                         title: name,
-                        icon: if data.icon.is_empty() {
-                            "◉".to_string()
-                        } else {
-                            data.icon
-                        },
+                        icon: if data.icon.is_empty() { "◉".to_string() } else { data.icon },
                         is_folder: false,
                         parent_id: parent_id(&id),
                         content: None,
@@ -254,7 +313,7 @@ pub fn notes_list(notes_root: State<NotesRoot>) -> Result<Vec<NoteEntry>, String
 #[tauri::command]
 pub fn notes_get(id: String, notes_root: State<NotesRoot>) -> Result<Option<NoteEntry>, String> {
     let root = notes_root.path.lock().map_err(|e| e.to_string())?;
-    let abs_path = root.join(&id);
+    let abs_path = safe_resolve(&root, &id)?;
 
     if !abs_path.exists() {
         return Ok(None);
@@ -270,39 +329,31 @@ pub fn notes_get(id: String, notes_root: State<NotesRoot>) -> Result<Option<Note
             None
         };
 
-        let dir_name = abs_path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-        let title = meta
-            .as_ref()
-            .map(|m| m.title.clone())
-            .unwrap_or(dir_name);
+        let dir_name = abs_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let title = meta.as_ref().map(|m| m.title.clone()).unwrap_or(dir_name);
 
         return Ok(Some(NoteEntry {
             id: id.clone(),
             name: title.clone(),
             title,
-            icon: meta.as_ref().map(|m| m.icon.clone()).unwrap_or("◈".to_string()),
-            is_folder: true,
-            parent_id: parent_id(&id),
-            content: None,
+            icon:       meta.as_ref().map(|m| m.icon.clone()).unwrap_or_else(|| "◈".to_string()),
+            is_folder:  true,
+            parent_id:  parent_id(&id),
+            content:    None,
             created_at: meta.as_ref().map(|m| m.created_at.clone()).unwrap_or_else(now_iso),
             updated_at: meta.as_ref().map(|m| m.updated_at.clone()).unwrap_or_else(now_iso),
         }));
     }
 
-    // File
     let data = read_note_file(&abs_path)?;
     Ok(Some(NoteEntry {
         id: id.clone(),
-        name: data.title.clone(),
-        title: data.title,
-        icon: if data.icon.is_empty() { "◉".to_string() } else { data.icon },
-        is_folder: false,
-        parent_id: parent_id(&id),
-        content: data.content,
+        name:       data.title.clone(),
+        title:      data.title,
+        icon:       if data.icon.is_empty() { "◉".to_string() } else { data.icon },
+        is_folder:  false,
+        parent_id:  parent_id(&id),
+        content:    data.content,
         created_at: data.created_at,
         updated_at: data.updated_at,
     }))
@@ -310,23 +361,24 @@ pub fn notes_get(id: String, notes_root: State<NotesRoot>) -> Result<Option<Note
 
 #[tauri::command]
 pub fn notes_create(payload: CreateNotePayload, notes_root: State<NotesRoot>) -> Result<NoteEntry, String> {
-    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
+    let root  = notes_root.path.lock().map_err(|e| e.to_string())?;
     let title = payload.title.unwrap_or_else(|| "Untitled".to_string());
+
     let parent_dir = match &payload.parent_id {
-        Some(pid) => root.join(pid),
-        None => root.clone(),
+        Some(pid) => safe_resolve(&root, pid)?,
+        None      => root.clone(),
     };
 
     fs::create_dir_all(&parent_dir).map_err(|e| e.to_string())?;
 
-    let slug = slugify(&title);
+    let slug      = slugify(&title);
     let file_path = make_unique_file_path(&parent_dir, &slug, NOTE_EXT);
-    let now = now_iso();
+    let now       = now_iso();
 
     let note_data = NoteFile {
-        title: title.clone(),
-        icon: payload.icon.unwrap_or_else(|| "◉".to_string()),
-        content: Some(serde_json::json!({ "type": "doc", "content": [] })),
+        title:      title.clone(),
+        icon:       payload.icon.unwrap_or_else(|| "◉".to_string()),
+        content:    Some(serde_json::json!({ "type": "doc", "content": [] })),
         created_at: now.clone(),
         updated_at: now.clone(),
     };
@@ -336,12 +388,12 @@ pub fn notes_create(payload: CreateNotePayload, notes_root: State<NotesRoot>) ->
     let id = rel_id(&file_path, &root);
     Ok(NoteEntry {
         id: id.clone(),
-        name: title.clone(),
+        name:       title.clone(),
         title,
-        icon: note_data.icon,
-        is_folder: false,
-        parent_id: parent_id(&id),
-        content: note_data.content,
+        icon:       note_data.icon,
+        is_folder:  false,
+        parent_id:  parent_id(&id),
+        content:    note_data.content,
         created_at: now.clone(),
         updated_at: now,
     })
@@ -349,24 +401,25 @@ pub fn notes_create(payload: CreateNotePayload, notes_root: State<NotesRoot>) ->
 
 #[tauri::command]
 pub fn notes_create_folder(payload: CreateNotePayload, notes_root: State<NotesRoot>) -> Result<NoteEntry, String> {
-    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
+    let root  = notes_root.path.lock().map_err(|e| e.to_string())?;
     let title = payload.title.unwrap_or_else(|| "New Folder".to_string());
+
     let parent_dir = match &payload.parent_id {
-        Some(pid) => root.join(pid),
-        None => root.clone(),
+        Some(pid) => safe_resolve(&root, pid)?,
+        None      => root.clone(),
     };
 
     fs::create_dir_all(&parent_dir).map_err(|e| e.to_string())?;
 
-    let slug = slugify(&title);
+    let slug     = slugify(&title);
     let dir_path = make_unique_dir_path(&parent_dir, &slug);
     fs::create_dir_all(&dir_path).map_err(|e| e.to_string())?;
 
     let now = now_iso();
     let meta = NoteFile {
-        title: title.clone(),
-        icon: payload.icon.unwrap_or_else(|| "◈".to_string()),
-        content: None,
+        title:      title.clone(),
+        icon:       payload.icon.unwrap_or_else(|| "◈".to_string()),
+        content:    None,
         created_at: now.clone(),
         updated_at: now.clone(),
     };
@@ -375,12 +428,12 @@ pub fn notes_create_folder(payload: CreateNotePayload, notes_root: State<NotesRo
     let id = rel_id(&dir_path, &root);
     Ok(NoteEntry {
         id: id.clone(),
-        name: title.clone(),
+        name:      title.clone(),
         title,
-        icon: meta.icon,
+        icon:      meta.icon,
         is_folder: true,
         parent_id: parent_id(&id),
-        content: None,
+        content:   None,
         created_at: now.clone(),
         updated_at: now,
     })
@@ -388,8 +441,8 @@ pub fn notes_create_folder(payload: CreateNotePayload, notes_root: State<NotesRo
 
 #[tauri::command]
 pub fn notes_update(payload: UpdateNotePayload, notes_root: State<NotesRoot>) -> Result<Option<NoteEntry>, String> {
-    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
-    let abs_path = root.join(&payload.id);
+    let root     = notes_root.path.lock().map_err(|e| e.to_string())?;
+    let abs_path = safe_resolve(&root, &payload.id)?;
 
     if !abs_path.exists() {
         return Ok(None);
@@ -403,67 +456,50 @@ pub fn notes_update(payload: UpdateNotePayload, notes_root: State<NotesRoot>) ->
             fs::read_to_string(&meta_path)
                 .ok()
                 .and_then(|raw| serde_json::from_str(&raw).ok())
-                .unwrap_or(NoteFile {
-                    title: "".to_string(),
-                    icon: "◈".to_string(),
-                    content: None,
-                    created_at: now.clone(),
-                    updated_at: now.clone(),
+                .unwrap_or_else(|| NoteFile {
+                    title: "".to_string(), icon: "◈".to_string(),
+                    content: None, created_at: now.clone(), updated_at: now.clone(),
                 })
         } else {
             NoteFile {
-                title: "".to_string(),
-                icon: "◈".to_string(),
-                content: None,
-                created_at: now.clone(),
-                updated_at: now.clone(),
+                title: "".to_string(), icon: "◈".to_string(),
+                content: None, created_at: now.clone(), updated_at: now.clone(),
             }
         };
 
-        if let Some(t) = &payload.title {
-            meta.title = t.clone();
-        }
-        if let Some(i) = &payload.icon {
-            meta.icon = i.clone();
-        }
+        if let Some(t) = &payload.title { meta.title = t.clone(); }
+        if let Some(i) = &payload.icon  { meta.icon  = i.clone(); }
         meta.updated_at = now.clone();
         write_note_file(&meta_path, &meta)?;
 
         return Ok(Some(NoteEntry {
-            id: payload.id.clone(),
-            name: meta.title.clone(),
-            title: meta.title,
-            icon: meta.icon,
+            id:        payload.id.clone(),
+            name:      meta.title.clone(),
+            title:     meta.title,
+            icon:      meta.icon,
             is_folder: true,
             parent_id: parent_id(&payload.id),
-            content: None,
+            content:   None,
             created_at: meta.created_at,
             updated_at: now,
         }));
     }
 
-    // File
     let mut data = read_note_file(&abs_path)?;
-    if let Some(t) = &payload.title {
-        data.title = t.clone();
-    }
-    if let Some(c) = &payload.content {
-        data.content = Some(c.clone());
-    }
-    if let Some(i) = &payload.icon {
-        data.icon = i.clone();
-    }
+    if let Some(t) = &payload.title   { data.title   = t.clone(); }
+    if let Some(c) = &payload.content { data.content = Some(c.clone()); }
+    if let Some(i) = &payload.icon    { data.icon    = i.clone(); }
     data.updated_at = now.clone();
     write_note_file(&abs_path, &data)?;
 
     Ok(Some(NoteEntry {
-        id: payload.id.clone(),
-        name: data.title.clone(),
-        title: data.title,
-        icon: data.icon,
+        id:        payload.id.clone(),
+        name:      data.title.clone(),
+        title:     data.title,
+        icon:      data.icon,
         is_folder: false,
         parent_id: parent_id(&payload.id),
-        content: data.content,
+        content:   data.content,
         created_at: data.created_at,
         updated_at: now,
     }))
@@ -471,8 +507,8 @@ pub fn notes_update(payload: UpdateNotePayload, notes_root: State<NotesRoot>) ->
 
 #[tauri::command]
 pub fn notes_delete(id: String, notes_root: State<NotesRoot>) -> Result<(), String> {
-    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
-    let abs_path = root.join(&id);
+    let root     = notes_root.path.lock().map_err(|e| e.to_string())?;
+    let abs_path = safe_resolve(&root, &id)?;
 
     if !abs_path.exists() {
         return Ok(());
@@ -489,13 +525,75 @@ pub fn notes_delete(id: String, notes_root: State<NotesRoot>) -> Result<(), Stri
 #[tauri::command]
 pub fn notes_open_folder(notes_root: State<NotesRoot>) -> Result<String, String> {
     let root = notes_root.path.lock().map_err(|e| e.to_string())?;
-    let path_str = root.to_string_lossy().to_string();
-    // Opening is done from frontend via shell plugin
-    Ok(path_str)
+    Ok(root.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 pub fn notes_get_root(notes_root: State<NotesRoot>) -> Result<String, String> {
     let root = notes_root.path.lock().map_err(|e| e.to_string())?;
     Ok(root.to_string_lossy().to_string())
+}
+
+/* ── Tests ── */
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn setup() -> (TempDir, PathBuf) {
+        let dir  = TempDir::new().unwrap();
+        let root = dir.path().join("notes");
+        fs::create_dir_all(&root).unwrap();
+        (dir, root)
+    }
+
+    // ── safe_resolve ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn resolve_normal_relative_path() {
+        let (_dir, root) = setup();
+        let target = root.join("sub");
+        fs::create_dir_all(&target).unwrap();
+        let canonical_root = fs::canonicalize(&root).unwrap();
+        let result = safe_resolve(&root, "sub").unwrap();
+        assert!(result.starts_with(&canonical_root));
+    }
+
+    #[test]
+    fn resolve_rejects_dotdot() {
+        let (_dir, root) = setup();
+        let err = safe_resolve(&root, "../escape").unwrap_err();
+        assert!(err.contains("traversal"), "expected traversal error, got: {err}");
+    }
+
+    #[test]
+    fn resolve_rejects_absolute_path() {
+        let (_dir, root) = setup();
+        // Use a path that is absolute on both Unix and Windows
+        let abs = if cfg!(windows) { r"C:\Windows\system32" } else { "/etc/passwd" };
+        let err = safe_resolve(&root, abs).unwrap_err();
+        assert!(
+            err.contains("relative") || err.contains("Absolute"),
+            "expected absolute-path error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn resolve_rejects_encoded_traversal() {
+        let (_dir, root) = setup();
+        // Attempt: "sub/../../etc" — still caught by the component scan.
+        let err = safe_resolve(&root, "sub/../../etc").unwrap_err();
+        assert!(err.contains("traversal"), "expected traversal error, got: {err}");
+    }
+
+    #[test]
+    fn resolve_nested_path_stays_inside_root() {
+        let (_dir, root) = setup();
+        let nested = root.join("a").join("b").join("c");
+        fs::create_dir_all(&nested).unwrap();
+        let canonical_root = fs::canonicalize(&root).unwrap();
+        let result = safe_resolve(&root, "a/b/c").unwrap();
+        assert!(result.starts_with(&canonical_root));
+    }
 }

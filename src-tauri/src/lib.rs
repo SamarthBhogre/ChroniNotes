@@ -3,16 +3,11 @@ mod commands;
 mod notifications;
 mod updater;
 
+use std::sync::Arc;
 use tauri::Manager;
 use db::Database;
 use commands::timer::TimerState;
 use commands::notes::NotesRoot;
-
-/// SAFETY: Database is stored in Tauri managed state with 'static lifetime.
-/// We use a raw pointer cast to pass it to the background notification thread.
-fn get_static_ref<T>(state: &T) -> &'static T {
-    unsafe { &*(state as *const T) }
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,7 +15,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
-            // Set up logging — always enabled so notification diagnostics are visible
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
                     .level(if cfg!(debug_assertions) {
@@ -31,27 +25,45 @@ pub fn run() {
                     .build(),
             )?;
 
-            // Resolve app data directory
             let app_data_dir = app
                 .path()
                 .app_data_dir()
                 .expect("Failed to resolve app data directory");
 
-            // Initialize database
             let database = Database::new(&app_data_dir);
             app.manage(database);
 
-            // Initialize notes root
             let notes_root = NotesRoot::new(&app_data_dir);
             app.manage(notes_root);
 
-            // Initialize timer state
-            let timer_state = TimerState::new();
+            // TimerState::new() returns Arc<TimerState>; manage the Arc so
+            // commands can clone it cheaply into background threads without
+            // any unsafe pointer arithmetic.
+            let timer_state: Arc<TimerState> = TimerState::new();
             app.manage(timer_state);
 
-            // Start notification scheduler for calendar reminders
-            let db_ref = get_static_ref(app.state::<Database>().inner());
-            notifications::spawn_notification_scheduler(app.handle().clone(), db_ref);
+            // Clone Arc<Database> — no unsafe, no raw pointers.
+            let db_for_scheduler = app.state::<Database>().inner().clone();
+
+            // `spawn_notification_scheduler` returns Err only when a scheduler
+            // is already alive (e.g. the setup closure was somehow called
+            // twice).  In normal operation this never fails; log and continue
+            // rather than crashing the whole app.
+            match notifications::spawn_notification_scheduler(
+                app.handle().clone(),
+                db_for_scheduler,
+            ) {
+                Ok(handle) => {
+                    // Store ShutdownHandle in managed state so it lives for
+                    // the full app lifetime.  A drop here would not stop the
+                    // scheduler (no Drop impl), but keeping it in state makes
+                    // the ownership relationship explicit.
+                    app.manage(handle);
+                }
+                Err(e) => {
+                    log::warn!("[App] Notification scheduler not started: {e}");
+                }
+            }
 
             Ok(())
         })

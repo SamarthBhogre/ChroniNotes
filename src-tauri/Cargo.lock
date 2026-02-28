@@ -540,10 +540,11 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chroninotes"
-version = "2.1.2"
+version = "2.2.0"
 dependencies = [
  "chrono",
  "log",
+ "regex-lite",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
@@ -554,6 +555,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-shell",
  "tempfile",
+ "url",
  "windows-sys 0.59.0",
 ]
 
@@ -3280,6 +3282,12 @@ dependencies = [
  "memchr",
  "regex-syntax",
 ]
+
+[[package]]
+name = "regex-lite"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cab834c73d247e67f4fae452806d17d3c7501756d98c8808d7c9c7aa7d18f973"
 
 [[package]]
 name = "regex-syntax"

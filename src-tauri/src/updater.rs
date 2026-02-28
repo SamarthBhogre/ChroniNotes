@@ -44,6 +44,11 @@ pub struct DownloadProgress {
 const GITHUB_REPO: &str = "SamarthBhogre/ChroniNotes";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The only host we will ever download from.
+const ALLOWED_DOWNLOAD_HOST: &str = "objects.githubusercontent.com";
+
+// ─── Version helpers ─────────────────────────────────────────────────────────
+
 /// Parse a version string like "2.0.0" or "v2.0.0" into (major, minor, patch)
 fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
     let v = v.trim().strip_prefix('v').unwrap_or(v);
@@ -65,6 +70,64 @@ fn is_newer(current: &str, latest: &str) -> bool {
         _ => false,
     }
 }
+
+// ─── Validation helpers ───────────────────────────────────────────────────────
+
+/// Reject any download URL that doesn't come from GitHub's release asset CDN.
+///
+/// GitHub asset URLs look like:
+///   https://objects.githubusercontent.com/github-production-release-asset-…
+///
+/// We never execute a URL supplied raw by the frontend — the frontend can only
+/// trigger a download for a URL we already fetched from the GitHub API (stored
+/// in `UpdateInfo`).  This second check is defence-in-depth in case something
+/// passes through an unexpected code path.
+fn validate_download_url(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url).map_err(|_| "Invalid download URL".to_string())?;
+
+    if parsed.scheme() != "https" {
+        return Err("Download URL must use HTTPS".to_string());
+    }
+
+    let host = parsed.host_str().unwrap_or("");
+    if host != ALLOWED_DOWNLOAD_HOST {
+        return Err(format!(
+            "Download URL host '{}' is not the expected GitHub asset host",
+            host
+        ));
+    }
+
+    Ok(())
+}
+
+/// Allow only a plain filename with a `.exe` extension; reject anything
+/// containing path separators or other shell-significant characters so we
+/// cannot be tricked into writing outside of `std::env::temp_dir()`.
+fn validate_installer_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("Installer name must not be empty".to_string());
+    }
+
+    // Must end with .exe (Windows installer)
+    if !name.to_ascii_lowercase().ends_with(".exe") {
+        return Err("Installer must be a .exe file".to_string());
+    }
+
+    // No path components or shell-significant characters
+    let forbidden = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '\0', ';', '&', '$'];
+    if name.chars().any(|c| forbidden.contains(&c)) {
+        return Err("Installer name contains forbidden characters".to_string());
+    }
+
+    // Reject leading dots (hidden files / relative path tricks)
+    if name.starts_with('.') {
+        return Err("Installer name must not start with '.'".to_string());
+    }
+
+    Ok(())
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
 
 /// Check GitHub for the latest release and compare versions
 #[tauri::command]
@@ -102,10 +165,7 @@ pub async fn updater_check() -> Result<UpdateInfo, String> {
         .assets
         .iter()
         .find(|a| a.name.ends_with(".exe") && !a.name.contains("debug"))
-        .or_else(|| {
-            // Fallback: any .exe
-            release.assets.iter().find(|a| a.name.ends_with(".exe"))
-        });
+        .or_else(|| release.assets.iter().find(|a| a.name.ends_with(".exe")));
 
     let (download_url, installer_name, installer_size) = match installer_asset {
         Some(asset) => (
@@ -113,10 +173,7 @@ pub async fn updater_check() -> Result<UpdateInfo, String> {
             asset.name.clone(),
             asset.size,
         ),
-        None => {
-            // No installer found — still return info but no download
-            ("".to_string(), "".to_string(), 0)
-        }
+        None => ("".to_string(), "".to_string(), 0),
     };
 
     let latest_version = release.tag_name.clone();
@@ -135,16 +192,21 @@ pub async fn updater_check() -> Result<UpdateInfo, String> {
     })
 }
 
-/// Download the installer and launch it, then close the app
+/// Download the installer and launch it, then close the app.
+///
+/// `download_url` and `installer_name` are validated before any I/O or
+/// process-launch takes place, preventing path-traversal and open-redirect
+/// attacks if the frontend passes unexpected values.
 #[tauri::command]
 pub async fn updater_download_and_install(
     app: AppHandle,
     download_url: String,
     installer_name: String,
 ) -> Result<(), String> {
-    if download_url.is_empty() || installer_name.is_empty() {
-        return Err("No installer URL provided".to_string());
-    }
+    // ── Validate inputs before touching disk or the network ──────────────────
+    validate_download_url(&download_url)?;
+    validate_installer_name(&installer_name)?;
+    // ─────────────────────────────────────────────────────────────────────────
 
     log::info!(
         "[Updater] Starting download: {} → {}",
@@ -169,7 +231,7 @@ pub async fn updater_download_and_install(
 
     let total_size = response.content_length().unwrap_or(0);
 
-    // Save to temp directory
+    // Build the destination path using only the basename we validated above
     let temp_dir = std::env::temp_dir();
     let installer_path = temp_dir.join(&installer_name);
 
@@ -178,7 +240,7 @@ pub async fn updater_download_and_install(
     let mut file = std::fs::File::create(&installer_path)
         .map_err(|e| format!("Failed to create temp file: {}", e))?;
 
-    // Stream download with progress
+    // Stream download
     let bytes = response
         .bytes()
         .await
@@ -206,24 +268,34 @@ pub async fn updater_download_and_install(
         downloaded
     );
 
-    // Launch the installer with elevated privileges (UAC prompt)
-    // Using ShellExecuteW with "runas" verb so the user gets a UAC prompt
-    // instead of requiring the entire app to run as administrator.
+    // Launch the installer with UAC elevation (Windows only)
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::ffi::OsStrExt;
         use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
 
-        let operation: Vec<u16> = OsStr::new("runas").encode_wide().chain(std::iter::once(0)).collect();
-        let file: Vec<u16> = OsStr::new(&installer_path).encode_wide().chain(std::iter::once(0)).collect();
-        let parameters: Vec<u16> = OsStr::new("").encode_wide().chain(std::iter::once(0)).collect();
-        let directory: Vec<u16> = OsStr::new(&temp_dir).encode_wide().chain(std::iter::once(0)).collect();
+        let operation: Vec<u16> = OsStr::new("runas")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let file_wide: Vec<u16> = OsStr::new(&installer_path)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let parameters: Vec<u16> = OsStr::new("")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let directory: Vec<u16> = OsStr::new(&temp_dir)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
 
         let result = unsafe {
             windows_sys::Win32::UI::Shell::ShellExecuteW(
                 std::ptr::null_mut(),
                 operation.as_ptr(),
-                file.as_ptr(),
+                file_wide.as_ptr(),
                 parameters.as_ptr(),
                 directory.as_ptr(),
                 windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
@@ -248,8 +320,7 @@ pub async fn updater_download_and_install(
 
     log::info!("[Updater] Installer launched. Closing app...");
 
-    // Close the app so the installer can update it
-    // Small delay to let the frontend show the message
+    // Give the frontend a moment to show a final message before we exit
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(1500));
         std::process::exit(0);
