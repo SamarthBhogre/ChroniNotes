@@ -42,3 +42,4 @@ Thumbs.db
 !run-tauri-dev.bat
 !run-tauri-build.bat
 !setup.bat
+nul

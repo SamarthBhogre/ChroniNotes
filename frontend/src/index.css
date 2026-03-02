@@ -913,6 +913,50 @@ select option {
   }
 }
 
+/* ═══════════════════════════════════════════════
+   PAGE-LINK CHIP  (tiptap inline node)
+═══════════════════════════════════════════════ */
+.page-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 6px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-size: 0.82em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, box-shadow 0.12s;
+  vertical-align: middle;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.page-link-chip:hover {
+  background: var(--accent-border);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ═══════════════════════════════════════════════
+   TIPTAP IMAGE STYLES
+═══════════════════════════════════════════════ */
+.tiptap img {
+  max-width: 100%;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  display: block;
+  margin: var(--spacing-md) auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.tiptap img:hover {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  transform: scale(1.005);
+}
+
 /* ── Warm Linen light theme overrides ── */
 /* Scrollbar looks better with darker thumb on light bg */
 [data-theme="warm-linen"] ::-webkit-scrollbar-thumb {
