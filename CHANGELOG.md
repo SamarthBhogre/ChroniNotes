@@ -10,7 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 **Tasks — Pointer-event drag and drop**
-- Replaced the broken HTML5 drag-and-drop API with a fully custom pointer-event system (useDragDrop hook) that works reliably inside Tauri WebView2 on Windows
+- Fixed drag and drop which was not working; now uses a custom pointer-event system (useDragDrop hook) that works reliably inside Tauri WebView2 on Windows
 - Global window.addEventListener pointermove and pointerup listeners are registered on drag start and cleaned up on release, preventing the WebView2 compositor from swallowing pointer events when the cursor leaves the originating element
 - Floating ghost card created imperatively on document.body follows the cursor with a slight rotation and scale, showing the task title
 - Column drop targets are hit-tested each pointermove via getBoundingClientRect on column refs; the hovered column receives an animated glow ring highlight
