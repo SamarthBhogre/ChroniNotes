@@ -9,12 +9,69 @@ use db::Database;
 use commands::timer::TimerState;
 use commands::notes::NotesRoot;
 
+#[cfg(target_os = "windows")]
+fn set_window_icon_win32(window: &tauri::WebviewWindow) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SendMessageW, ICON_BIG, ICON_SMALL, WM_SETICON,
+        LoadImageW, IMAGE_ICON, LR_LOADFROMFILE, LR_DEFAULTSIZE,
+    };
+    use windows_sys::Win32::Foundation::HWND;
+
+    // Embed the .ico at compile time, write to temp so LoadImageW can read it.
+    let ico_bytes = include_bytes!("../icons/ChroniNotes.ico");
+    let tmp = std::env::temp_dir().join("chroninotes_icon.ico");
+    std::fs::write(&tmp, ico_bytes).ok();
+
+    let path_wide: Vec<u16> = tmp.to_string_lossy()
+        .encode_utf16()
+        .chain(std::iter::once(0u16))
+        .collect();
+
+    // raw_window_handle() returns RawWindowHandle directly on Tauri's WebviewWindow
+    let hwnd = match window.window_handle().map(|h| h.as_raw()) {
+        Ok(RawWindowHandle::Win32(h)) => h.hwnd.get() as HWND,
+        _ => return,
+    };
+
+    unsafe {
+        let hicon_big = LoadImageW(
+            std::ptr::null_mut(),
+            path_wide.as_ptr(),
+            IMAGE_ICON,
+            0, 0,
+            LR_LOADFROMFILE | LR_DEFAULTSIZE,
+        );
+        let hicon_small = LoadImageW(
+            std::ptr::null_mut(),
+            path_wide.as_ptr(),
+            IMAGE_ICON,
+            16, 16,
+            LR_LOADFROMFILE,
+        );
+
+        if !hicon_big.is_null() {
+            SendMessageW(hwnd, WM_SETICON, ICON_BIG as usize, hicon_big as isize);
+        }
+        if !hicon_small.is_null() {
+            SendMessageW(hwnd, WM_SETICON, ICON_SMALL as usize, hicon_small as isize);
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            // Set the window icon via Win32 WM_SETICON so the taskbar and
+            // alt-tab show the correct high-res icon even with decorations off.
+            #[cfg(target_os = "windows")]
+            if let Some(window) = app.get_webview_window("main") {
+                set_window_icon_win32(&window);
+            }
+
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
                     .level(if cfg!(debug_assertions) {
@@ -98,6 +155,7 @@ pub fn run() {
             commands::notes::notes_delete,
             commands::notes::notes_open_folder,
             commands::notes::notes_get_root,
+            commands::notes::notes_move,
             // Timer Presets
             commands::timer_presets::timer_presets_list,
             commands::timer_presets::timer_presets_create,

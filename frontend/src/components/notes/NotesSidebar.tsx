@@ -118,13 +118,16 @@ export default function NotesSidebar() {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); searchRef.current?.focus() }
       if (e.key === "Escape") { setSelectMode(false); setSelected(new Set()) }
-      /* Ctrl+A — select all visible root notes while in select mode */
+      /* Ctrl+A — select all visible notes while in select mode */
       if (selectMode && (e.ctrlKey || e.metaKey) && e.key === "a") {
         e.preventDefault()
         setSelected(new Set(notes.map(n => n.id)))
       }
-      /* Delete key — delete selected */
-      if (selectMode && (e.key === "Delete" || e.key === "Backspace") && selected.size > 0) {
+      /* Delete/Backspace — delete selected items (works with or without explicit selectMode toggle) */
+      if (selected.size > 0 && (e.key === "Delete" || e.key === "Backspace")) {
+        // Don't intercept when typing in an input/textarea
+        const tag = (e.target as HTMLElement).tagName
+        if (tag === "INPUT" || tag === "TEXTAREA") return
         e.preventDefault()
         handleMassDelete()
       }
@@ -134,6 +137,8 @@ export default function NotesSidebar() {
   }, [notes, selectMode, selected])
 
   const handleDrop = useCallback((dragId: string, targetId: string, pos: "before" | "after") => {
+    // reorderNote handles both same-parent (sortOrder only) and
+    // cross-parent (calls notes:move then reloads) — no extra logic needed here.
     reorderNote(dragId, targetId, pos)
   }, [reorderNote])
 
@@ -141,6 +146,15 @@ export default function NotesSidebar() {
 
   /* ── Selection helpers ── */
   const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  // Shift+click: activate select mode + toggle the item in one gesture
+  const shiftSelect = (id: string) => {
+    setSelectMode(true)
     setSelected(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
@@ -257,7 +271,8 @@ export default function NotesSidebar() {
             overId={overId} overPos={overPos}
             isDragging={isDragging} isDraggingAny={isDraggingAny}
             onStartDrag={startDrag} registerRow={registerRow}
-            selectMode={selectMode} selected={selected} onToggleSelect={toggleSelect}
+            selectMode={selectMode} selected={selected}
+            onToggleSelect={toggleSelect} onShiftSelect={shiftSelect}
             onSelect={setActiveNote} onToggle={toggleFolder}
             onDelete={deleteNote} onCreate={createNote} onCreateFolder={createFolder}
             onRename={(id, title) => updateNote(id, { title })}
@@ -289,9 +304,11 @@ interface TreeNodeProps {
   isDragging: (id: string) => boolean; isDraggingAny: boolean
   onStartDrag: (note: NoteEntry, e: React.PointerEvent) => void
   registerRow:  (id: string, el: HTMLDivElement | null) => void
-  selectMode: boolean; selected: Set<string>; onToggleSelect: (id: string) => void
+  selectMode: boolean; selected: Set<string>
+  onToggleSelect: (id: string) => void
+  onShiftSelect:  (id: string) => void
   onSelect: (id: string) => void; onToggle: (id: string) => void
-  onDelete: (id: string) => void; onCreate: (parentId: string) => void
+  onDelete: (id: string) => void; onCreate: (parentId: string, navigate?: boolean) => void
   onCreateFolder: (parentId: string) => void
   onRename: (id: string, title: string) => void
   onUpdateMeta: (id: string, patch: any) => void
@@ -302,7 +319,7 @@ function TreeNode({
   note, allNotes, depth, activeNoteId, expandedFolders,
   overId, overPos, isDragging, isDraggingAny,
   onStartDrag, registerRow,
-  selectMode, selected, onToggleSelect,
+  selectMode, selected, onToggleSelect, onShiftSelect,
   onSelect, onToggle, onDelete, onCreate, onCreateFolder,
   onRename, onUpdateMeta, onMoveUp, onMoveDown,
 }: TreeNodeProps) {
@@ -341,8 +358,13 @@ function TreeNode({
     setIsEditing(false)
   }
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     if (amDragging) return
+    // Shift+click: enter select mode immediately and toggle this item
+    if (e.shiftKey) {
+      onShiftSelect(note.id)
+      return
+    }
     if (selectMode) { onToggleSelect(note.id); return }
     if (note.isFolder) onToggle(note.id)
     onSelect(note.id)
@@ -481,7 +503,8 @@ function TreeNode({
               overId={overId} overPos={overPos}
               isDragging={isDragging} isDraggingAny={isDraggingAny}
               onStartDrag={onStartDrag} registerRow={registerRow}
-              selectMode={selectMode} selected={selected} onToggleSelect={onToggleSelect}
+              selectMode={selectMode} selected={selected}
+              onToggleSelect={onToggleSelect} onShiftSelect={onShiftSelect}
               onSelect={onSelect} onToggle={onToggle}
               onDelete={onDelete} onCreate={onCreate} onCreateFolder={onCreateFolder}
               onRename={onRename} onUpdateMeta={onUpdateMeta}

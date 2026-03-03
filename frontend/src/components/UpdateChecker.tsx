@@ -48,8 +48,9 @@ export default function UpdateChecker() {
 
   /* ── Listen for download progress events ── */
   useEffect(() => {
-    window.electron.on("updater:progress", (data: any) => {
-      if (data.percent) setProgress(Math.round(data.percent))
+    return window.electron.on("updater:progress", (data: unknown) => {
+      const p = data as { percent?: number }
+      if (p.percent != null) setProgress(Math.round(p.percent))
     })
   }, [])
 
@@ -65,7 +66,7 @@ export default function UpdateChecker() {
     setState("checking")
     setError("")
     try {
-      const result: UpdateInfo = await window.electron.invoke("updater:check")
+      const result = await window.electron.invoke("updater:check") as UpdateInfo
       setInfo(result)
       if (result.update_available && result.download_url) {
         setState("available")

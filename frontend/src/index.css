@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -34,6 +35,9 @@
   --glow-a: #6366f1;
   --glow-b: #8b5cf6;
   --glow-c: #06b6d4;
+
+  --logo-grad-start: #818cf8;
+  --logo-grad-end:   #8b5cf6;
 
   --text-primary: rgba(255, 255, 255, 0.92);
   --text-secondary: rgba(255, 255, 255, 0.55);
@@ -88,6 +92,9 @@
   --glow-b: #2a4f7c;
   --glow-c: #d4920a;
 
+  --logo-grad-start: #5b8fc9;
+  --logo-grad-end:   #3d6ea8;
+
   --text-primary: rgba(232, 234, 237, 0.92);
   --text-secondary: rgba(155, 181, 200, 0.75);
   --text-tertiary: rgba(155, 181, 200, 0.38);
@@ -140,6 +147,9 @@
   --glow-a: #9e8e84;
   --glow-b: #c4b8b0;
   --glow-c: #7a6a5e;
+
+  --logo-grad-start: #7a6a5e;
+  --logo-grad-end:   #9e8e84;
 
   --text-primary: rgba(26, 23, 20, 0.90);
   --text-secondary: rgba(26, 23, 20, 0.55);
@@ -195,6 +205,9 @@
   --glow-b: #f06020;
   --glow-c: #d0d0d0;
 
+  --logo-grad-start: #e8380a;
+  --logo-grad-end:   #f06020;
+
   --text-primary: rgba(26, 26, 26, 0.90);
   --text-secondary: rgba(26, 26, 26, 0.55);
   --text-tertiary: rgba(26, 26, 26, 0.36);
@@ -248,6 +261,9 @@
   --glow-a: #58a4b0;
   --glow-b: #373f51;
   --glow-c: #a9bcd0;
+
+  --logo-grad-start: #58a4b0;
+  --logo-grad-end:   #a9bcd0;
 
   --text-primary: rgba(216, 219, 226, 0.95);
   --text-secondary: rgba(169, 188, 208, 0.70);

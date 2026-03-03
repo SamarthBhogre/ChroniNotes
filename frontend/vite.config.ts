@@ -1,9 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+// Single authoritative version source: root package.json
+const rootPkg = JSON.parse(
+  readFileSync(resolve(__dirname, '../package.json'), 'utf-8')
+) as { version: string }
+
+const APP_VERSION = rootPkg.version
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+
+  // Inject APP_VERSION as a compile-time constant so any file can use
+  // `import.meta.env.VITE_APP_VERSION` without runtime fetches.
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(APP_VERSION),
+  },
+
   build: {
     // Smaller chunk size threshold for better lazy-loading
     chunkSizeWarningLimit: 600,

@@ -58,7 +58,7 @@ export default function Dashboard({ onNavigate }: Props) {
 
   const activeTasks = tasks.length
   const doneTasks   = tasks.filter(t => t.status === "done").length
-  const doingTasks  = tasks.filter(t => t.status === "doing").length
+  const doingTasks  = tasks.filter(t => t.status === "in-progress").length
   const todoTasks   = tasks.filter(t => t.status === "todo").length
 
   const [focusHistory, setFocusHistory]         = useState<{ date: string; count: number; total_seconds: number }[]>([])
@@ -66,9 +66,15 @@ export default function Dashboard({ onNavigate }: Props) {
   const [yesterdayMinutes, setYesterdayMinutes] = useState(0)
 
   useEffect(() => {
-    window.electron.invoke("focus:history").then(setFocusHistory).catch(() => {})
-    window.electron.invoke("focus:todayMinutes").then(setTodayMinutes).catch(() => {})
-    window.electron.invoke("focus:yesterdayMinutes").then(setYesterdayMinutes).catch(() => {})
+    window.electron.invoke("focus:history")
+      .then(d => setFocusHistory(d as { date: string; count: number; total_seconds: number }[]))
+      .catch(() => {})
+    window.electron.invoke("focus:todayMinutes")
+      .then(d => setTodayMinutes(d as number))
+      .catch(() => {})
+    window.electron.invoke("focus:yesterdayMinutes")
+      .then(d => setYesterdayMinutes(d as number))
+      .catch(() => {})
   }, [])
 
   const focusDayActivity = focusHistory.map(d => ({ date: d.date, count: d.count }))

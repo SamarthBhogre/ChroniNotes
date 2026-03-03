@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react"
 import { useTasksStore } from "../store/tasks.store"
+import type { TaskStatus } from "../store/tasks.store"
 
-const STATUSES = ["todo", "doing", "done"] as const
-type Status = typeof STATUSES[number]
+const STATUSES = ["todo", "in-progress", "done"] as const
 
-const STATUS_CONFIG = {
-  todo:  { label: "To Do",       accent: "var(--text-tertiary)",  glow: "rgba(255,255,255,0.08)", dot: "#94a3b8", bg: "rgba(148,163,184,0.06)" },
-  doing: { label: "In Progress", accent: "var(--color-blue)",     glow: "rgba(96,165,250,0.12)",  dot: "#60a5fa", bg: "rgba(96,165,250,0.06)"  },
-  done:  { label: "Done",        accent: "var(--color-green)",    glow: "rgba(52,211,153,0.12)",  dot: "#34d399", bg: "rgba(52,211,153,0.06)"  },
+const STATUS_CONFIG: Record<TaskStatus, {
+  label: string; accent: string; glow: string; dot: string; bg: string
+}> = {
+  "todo":        { label: "To Do",       accent: "var(--text-tertiary)",  glow: "rgba(255,255,255,0.08)", dot: "#94a3b8", bg: "rgba(148,163,184,0.06)" },
+  "in-progress": { label: "In Progress", accent: "var(--color-blue)",     glow: "rgba(96,165,250,0.12)",  dot: "#60a5fa", bg: "rgba(96,165,250,0.06)"  },
+  "done":        { label: "Done",        accent: "var(--color-green)",    glow: "rgba(52,211,153,0.12)",  dot: "#34d399", bg: "rgba(52,211,153,0.06)"  },
 }
 
 /* ──────────────────────────────────────────
@@ -45,7 +47,7 @@ function useGlobalStyles() {
 ────────────────────────────────────────── */
 type DragState = {
   taskId: number
-  fromStatus: Status
+  fromStatus: TaskStatus
   startX: number
   startY: number
   currentX: number
@@ -53,10 +55,10 @@ type DragState = {
   active: boolean          // true once dragged > threshold
 }
 
-function useDragDrop(onDrop: (taskId: number, toStatus: Status) => void) {
+function useDragDrop(onDrop: (taskId: number, toStatus: TaskStatus) => void) {
   const [drag, setDrag] = useState<DragState | null>(null)
-  const [overCol, setOverCol] = useState<Status | null>(null)
-  const colRefs = useRef<Partial<Record<Status, HTMLDivElement>>>({})
+  const [overCol, setOverCol] = useState<TaskStatus | null>(null)
+  const colRefs = useRef<Partial<Record<TaskStatus, HTMLDivElement>>>({})
   const ghostRef = useRef<HTMLDivElement | null>(null)
 
   /* ── Create / destroy floating ghost ── */
@@ -97,7 +99,7 @@ function useDragDrop(onDrop: (taskId: number, toStatus: Status) => void) {
   /* ── Detect which column pointer is over ── */
   useEffect(() => {
     if (!drag?.active) { setOverCol(null); return }
-    let found: Status | null = null
+    let found: TaskStatus | null = null
     for (const s of STATUSES) {
       const el = colRefs.current[s]
       if (!el) continue
@@ -130,7 +132,7 @@ function useDragDrop(onDrop: (taskId: number, toStatus: Status) => void) {
     const onUp = (e: PointerEvent) => {
       if (drag.active) {
         // find column under pointer
-        let target: Status | null = null
+        let target: TaskStatus | null = null
         for (const s of STATUSES) {
           const el = colRefs.current[s]
           if (!el) continue
@@ -158,7 +160,7 @@ function useDragDrop(onDrop: (taskId: number, toStatus: Status) => void) {
     }
   }, [drag, onDrop])
 
-  const startDrag = (taskId: number, fromStatus: Status, title: string, e: React.PointerEvent) => {
+  const startDrag = (taskId: number, fromStatus: TaskStatus, title: string, e: React.PointerEvent) => {
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     if (ghostRef.current) ghostRef.current.textContent = title
@@ -170,7 +172,7 @@ function useDragDrop(onDrop: (taskId: number, toStatus: Status) => void) {
     })
   }
 
-  const setColRef = (s: Status) => (el: HTMLDivElement | null) => {
+  const setColRef = (s: TaskStatus) => (el: HTMLDivElement | null) => {
     if (el) colRefs.current[s] = el
   }
 
@@ -199,7 +201,7 @@ function useCardEnter(delay: number) {
 export default function Tasks() {
   const [title, setTitle]   = useState("")
   const [adding, setAdding] = useState(false)
-  const [filter, setFilter] = useState<"all" | Status>("all")
+  const [filter, setFilter] = useState<"all" | TaskStatus>("all")
   const inputRef = useRef<HTMLInputElement>(null)
 
   useGlobalStyles()
@@ -207,12 +209,16 @@ export default function Tasks() {
   const { tasks, loadTasks, createTask, updateStatus, deleteTask } = useTasksStore()
   useEffect(() => { loadTasks() }, [])
 
-  const handleDrop = (taskId: number, toStatus: Status) => {
-    // Optimistic update
+  const handleDrop = (taskId: number, toStatus: TaskStatus) => {
+    // Apply optimistic update immediately for instant visual feedback
+    const prevTasks = useTasksStore.getState().tasks
     useTasksStore.setState(s => ({
       tasks: s.tasks.map(t => t.id === taskId ? { ...t, status: toStatus } : t),
     }))
-    updateStatus(taskId, toStatus)
+    // Persist; store will rollback to prevTasks on failure
+    updateStatus(taskId, toStatus).catch(() => {
+      useTasksStore.setState({ tasks: prevTasks })
+    })
   }
 
   const { startDrag, setColRef, overCol, isDragging, isDraggingAny } = useDragDrop(handleDrop)
@@ -226,11 +232,11 @@ export default function Tasks() {
     inputRef.current?.focus()
   }
 
-  const filteredStatuses = filter === "all" ? [...STATUSES] : [filter] as Status[]
+  const filteredStatuses = filter === "all" ? [...STATUSES] : [filter] as TaskStatus[]
 
-  const todoCount  = tasks.filter(t => t.status === "todo").length
-  const doingCount = tasks.filter(t => t.status === "doing").length
-  const doneCount  = tasks.filter(t => t.status === "done").length
+  const todoCount       = tasks.filter(t => t.status === "todo").length
+  const inProgressCount = tasks.filter(t => t.status === "in-progress").length
+  const doneCount       = tasks.filter(t => t.status === "done").length
 
   return (
     <div style={{ height: "100%", color: "var(--text-primary)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -259,10 +265,10 @@ export default function Tasks() {
         {/* Filter pills */}
         <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           {([
-            { key: "all"   as const, label: "All",    count: tasks.length, color: "var(--text-secondary)" },
-            { key: "todo"  as const, label: "To Do",  count: todoCount,    color: STATUS_CONFIG.todo.dot  },
-            { key: "doing" as const, label: "Active", count: doingCount,   color: STATUS_CONFIG.doing.dot },
-            { key: "done"  as const, label: "Done",   count: doneCount,    color: STATUS_CONFIG.done.dot  },
+            { key: "all"          as const, label: "All",    count: tasks.length,    color: "var(--text-secondary)" },
+            { key: "todo"         as const, label: "To Do",  count: todoCount,        color: STATUS_CONFIG.todo.dot  },
+            { key: "in-progress"  as const, label: "Active", count: inProgressCount,  color: STATUS_CONFIG["in-progress"].dot },
+            { key: "done"         as const, label: "Done",   count: doneCount,        color: STATUS_CONFIG.done.dot  },
           ]).map(({ key, label, count, color }) => {
             const active = filter === key
             return (
@@ -395,10 +401,13 @@ export default function Tasks() {
                       dragging={isDragging(task.id)}
                       onPointerDown={(e) => startDrag(task.id, status, task.title, e)}
                       onStatusChange={val => {
+                        const prevTasks = useTasksStore.getState().tasks
                         useTasksStore.setState(s => ({
                           tasks: s.tasks.map(t => t.id === task.id ? { ...t, status: val } : t),
                         }))
-                        updateStatus(task.id, val)
+                        updateStatus(task.id, val).catch(() => {
+                          useTasksStore.setState({ tasks: prevTasks })
+                        })
                       }}
                       onDelete={() => deleteTask(task.id)}
                     />
@@ -428,7 +437,7 @@ export default function Tasks() {
 ────────────────────────────────────────── */
 function EmptySlot({ isTarget, dot, status }: { isTarget: boolean; dot: string; status: string }) {
   const msgs: Record<string, string> = {
-    todo: "No tasks yet", doing: "Nothing in progress", done: "Nothing done yet",
+    todo: "No tasks yet", "in-progress": "Nothing in progress", done: "Nothing done yet",
   }
   return (
     <li style={{
@@ -464,10 +473,10 @@ function TaskCard({
 }: {
   task: { id: number; title: string; status: string }
   index: number
-  cfg: typeof STATUS_CONFIG[Status]
+  cfg: typeof STATUS_CONFIG[TaskStatus]
   dragging: boolean
   onPointerDown: (e: React.PointerEvent) => void
-  onStatusChange: (v: Status) => void
+  onStatusChange: (v: TaskStatus) => void
   onDelete: () => void
 }) {
   const [hovered, setHovered]   = useState(false)
@@ -476,7 +485,7 @@ function TaskCard({
   const ref = useCardEnter(index * 28)
 
   const isDone   = task.status === "done"
-  const isDoing  = task.status === "doing"
+  const isDoing  = task.status === "in-progress"
 
   /* ── Delete with exit animation ── */
   const handleDelete = (e: React.MouseEvent) => {
@@ -501,12 +510,12 @@ function TaskCard({
     if (btnAnim) return
     setBtnAnim(true)
     setTimeout(() => setBtnAnim(false), 320)
-    const next = (task.status === "todo" ? "doing" : task.status === "doing" ? "done" : "todo") as Status
+    const next = (task.status === "todo" ? "in-progress" : task.status === "in-progress" ? "done" : "todo") as TaskStatus
     onStatusChange(next)
   }
 
   const nextLabel = task.status === "todo" ? "Move to In Progress"
-                  : task.status === "doing" ? "Mark as Done"
+                  : task.status === "in-progress" ? "Mark as Done"
                   : "Reset to To Do"
 
   return (

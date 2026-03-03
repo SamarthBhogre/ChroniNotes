@@ -95,16 +95,16 @@ export const useCalendarStore = create<CalendarStore>((set, get) => ({
   activeDates: [],
 
   loadEvents: async (month) => {
-    const data = await window.electron.invoke("calendar:list", month)
+    const data = await window.electron.invoke("calendar:list", month) as CalendarEvent[]
     set({ events: data })
   },
 
   loadEventsByDate: async (date) => {
-    return await window.electron.invoke("calendar:listByDate", date)
+    return await window.electron.invoke("calendar:listByDate", date) as CalendarEvent[]
   },
 
   loadActiveDates: async (month) => {
-    const data = await window.electron.invoke("calendar:activeDates", month)
+    const data = await window.electron.invoke("calendar:activeDates", month) as ActiveDate[]
     set({ activeDates: data })
   },
 
@@ -112,8 +112,8 @@ export const useCalendarStore = create<CalendarStore>((set, get) => ({
     await window.electron.invoke("calendar:create", event)
     const month = event.date.slice(0, 7)
     const [events, activeDates] = await Promise.all([
-      window.electron.invoke("calendar:list", month),
-      window.electron.invoke("calendar:activeDates", month),
+      window.electron.invoke("calendar:list", month) as Promise<CalendarEvent[]>,
+      window.electron.invoke("calendar:activeDates", month) as Promise<ActiveDate[]>,
     ])
     set({ events, activeDates })
   },
@@ -122,8 +122,8 @@ export const useCalendarStore = create<CalendarStore>((set, get) => ({
     await window.electron.invoke("calendar:update", { id, ...fields })
     const month = (fields.date ?? get().events.find(e => e.id === id)?.date ?? todayStr()).slice(0, 7)
     const [events, activeDates] = await Promise.all([
-      window.electron.invoke("calendar:list", month),
-      window.electron.invoke("calendar:activeDates", month),
+      window.electron.invoke("calendar:list", month) as Promise<CalendarEvent[]>,
+      window.electron.invoke("calendar:activeDates", month) as Promise<ActiveDate[]>,
     ])
     set({ events, activeDates })
   },
@@ -133,8 +133,8 @@ export const useCalendarStore = create<CalendarStore>((set, get) => ({
     const month = ev?.date?.slice(0, 7) ?? todayStr().slice(0, 7)
     await window.electron.invoke("calendar:delete", id)
     const [events, activeDates] = await Promise.all([
-      window.electron.invoke("calendar:list", month),
-      window.electron.invoke("calendar:activeDates", month),
+      window.electron.invoke("calendar:list", month) as Promise<CalendarEvent[]>,
+      window.electron.invoke("calendar:activeDates", month) as Promise<ActiveDate[]>,
     ])
     set({ events, activeDates })
   },

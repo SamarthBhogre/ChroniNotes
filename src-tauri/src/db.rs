@@ -497,4 +497,67 @@ pub mod tests {
         // Either outcome is acceptable — the important invariant is no panic.
         let _ = result;
     }
+
+    // ── Migration maintainability guard ───────────────────────────────────────
+    //
+    // If a column is added to `create_schema` but NOT to the `col_list` inside
+    // `rebuild_table_with_checks`, that column is silently dropped on legacy
+    // installs that trigger the rebuild path.  This test catches that divergence
+    // at compile/test time.
+
+    /// The column list in `rebuild_table_with_checks` for "tasks" must include
+    /// every column that `create_schema` creates for that table.
+    #[test]
+    fn rebuild_column_list_covers_all_schema_columns_for_tasks() {
+        let (_dir, db) = test_db();
+        let conn = db.conn().lock().unwrap();
+
+        // The columns that the schema creates (from create_schema).
+        let schema_cols = table_columns(&conn, "tasks").unwrap();
+
+        // The columns listed in rebuild_table_with_checks for "tasks".
+        // If you add a column to create_schema, add it here too.
+        let rebuild_cols: Vec<&str> = "id, title, status, created_at, completed_at, due_date"
+            .split(',')
+            .map(|s| s.trim())
+            .collect();
+
+        for col in &schema_cols {
+            assert!(
+                rebuild_cols.contains(&col.as_str()),
+                "Column '{}' exists in tasks schema but is missing from \
+                 rebuild_table_with_checks col_list — \
+                 it would be silently dropped on legacy installs. \
+                 Add it to both create_schema AND the rebuild col_list.",
+                col
+            );
+        }
+    }
+
+    /// Same guard for "calendar_events".
+    #[test]
+    fn rebuild_column_list_covers_all_schema_columns_for_calendar_events() {
+        let (_dir, db) = test_db();
+        let conn = db.conn().lock().unwrap();
+
+        let schema_cols = table_columns(&conn, "calendar_events").unwrap();
+
+        let rebuild_cols: Vec<&str> =
+            "id, title, type, date, start_time, end_time, duration_minutes, \
+             color, notes, task_id, reminder_minutes, notified, created_at"
+                .split(',')
+                .map(|s| s.trim())
+                .collect();
+
+        for col in &schema_cols {
+            assert!(
+                rebuild_cols.contains(&col.as_str()),
+                "Column '{}' exists in calendar_events schema but is missing from \
+                 rebuild_table_with_checks col_list — \
+                 it would be silently dropped on legacy installs. \
+                 Add it to both create_schema AND the rebuild col_list.",
+                col
+            );
+        }
+    }
 }

@@ -5,6 +5,7 @@ import WelcomeScreen from "./components/WelcomeScreen"
 import Settings from "./pages/Settings"
 import About from "./pages/About"
 import UpdateChecker from "./components/UpdateChecker"
+import BrandLogo from "./components/BrandLogo"
 import { useThemeStore } from "./store/theme.store"
 
 import "./store/theme.store"
@@ -19,9 +20,12 @@ type Page = "dashboard" | "tasks" | "notes" | "timer" | "calendar"
 
 function PageSkeleton() {
   return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", fontSize: "13px", gap: "10px" }}>
-      <div style={{ width: "16px", height: "16px", borderRadius: "50%", border: "2px solid var(--glass-border-strong)", borderTopColor: "var(--accent)", animation: "spin 0.7s linear infinite" }} />
-      Loading…
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px", color: "var(--text-tertiary)" }}>
+      <BrandLogo variant="gradient" size={44} animate />
+      <div style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "11px" }}>
+        <div style={{ width: "13px", height: "13px", borderRadius: "50%", border: "2px solid var(--glass-border-strong)", borderTopColor: "var(--accent)", animation: "spin 0.7s linear infinite" }} />
+        Loading…
+      </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )

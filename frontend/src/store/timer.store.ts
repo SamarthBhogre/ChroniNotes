@@ -80,7 +80,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   },
 
   loadSettings: async () => {
-    const s = await window.electron.invoke("pomodoro:getSettings")
+    const s = await window.electron.invoke("pomodoro:getSettings") as { workMinutes: number; breakMinutes: number }
     set({ workMinutes: s.workMinutes, breakMinutes: s.breakMinutes })
   },
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
+import BrandLogo from "./BrandLogo"
 
 /* ─────────────────────────────────────────────
    Windows 11 OOBE-style welcome screen
@@ -110,10 +111,7 @@ export default function WelcomeScreen({ onFinished }: Props) {
       <div className="ws-center">
         {/* Logo */}
         <div className={`ws-logo ${phase >= 0 ? "ws-logo-visible" : ""}`}>
-          <div className="ws-logo-ring" />
-          <div className="ws-logo-inner">
-            <span className="ws-logo-letter">C</span>
-          </div>
+          <BrandLogo size={108} animate />
         </div>
 
         {/* Text */}
@@ -238,7 +236,9 @@ const welcomeStyles = `
 /* ── Logo ── */
 .ws-logo {
   position: relative;
-  width: 84px; height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
   transform: scale(0.5) translateY(12px);
   transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
@@ -249,31 +249,9 @@ const welcomeStyles = `
   transform: scale(1) translateY(0);
 }
 
-.ws-logo-ring {
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-border);
-}
-
-.ws-logo-inner {
-  width: 100%; height: 100%;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--glow-a), var(--glow-b));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 40px var(--accent-glow),
-              0 0 80px var(--accent-dim);
-}
-
-.ws-logo-letter {
-  font-size: 34px;
-  font-weight: 700;
-  color: white;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  font-family: 'Inter', sans-serif;
-}
+.ws-logo-ring  { display: none; }
+.ws-logo-inner { display: none; }
+.ws-logo-letter { display: none; }
 
 /* ── Text ── */
 .ws-text-block {

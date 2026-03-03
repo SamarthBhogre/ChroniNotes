@@ -1,6 +1,6 @@
 {
   "name": "chroninotes",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Offline-first desktop productivity assistant for students",
   "private": true,
   "scripts": {
@@ -13,5 +13,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
 }

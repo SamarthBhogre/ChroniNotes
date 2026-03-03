@@ -1,6 +1,6 @@
 [package]
 name = "chroninotes"
-version = "2.3.0"
+version = "2.4.0"
 description = "Offline-first desktop productivity assistant for students"
 authors = ["Samarth Bhogre"]
 license = "MIT"
@@ -20,7 +20,7 @@ serde_json = "1.0"
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 rusqlite = { version = "0.33", features = ["bundled"] }
-tauri = { version = "2.10.0", features = [] }
+tauri = { version = "2.10.0", features = ["image-ico", "image-png"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-shell = "2"
@@ -29,8 +29,10 @@ url = "2"
 tempfile = "3"
 regex-lite = "0.1"
 
+raw-window-handle = "0.6"
+
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.59", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_Foundation"] }
 
 [profile.release]
 panic = "abort"

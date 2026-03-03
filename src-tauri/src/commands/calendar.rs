@@ -318,10 +318,9 @@ pub fn calendar_list_by_range(
     rows
 }
 
-#[tauri::command]
-pub fn calendar_update(
+pub(crate) fn calendar_update_inner(
     payload: UpdateEventPayload,
-    db: State<Database>,
+    db: &Database,
 ) -> Result<CalendarEvent, String> {
     // Validate every provided field before touching the DB.
     if let Some(ref t) = payload.title       { validate_title(t)?; }
@@ -410,6 +409,14 @@ pub fn calendar_update(
     let mut stmt = conn.prepare(&select_sql).map_err(|e| e.to_string())?;
     stmt.query_row(params![payload.id], row_to_event)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn calendar_update(
+    payload: UpdateEventPayload,
+    db: State<Database>,
+) -> Result<CalendarEvent, String> {
+    calendar_update_inner(payload, db.inner())
 }
 
 pub(crate) fn calendar_delete_inner(id: i64, db: &Database) -> Result<(), String> {
@@ -728,5 +735,97 @@ mod tests {
             |r| r.get(0),
         ).unwrap();
         assert_eq!(count, 0, "Event must be gone after delete");
+    }
+
+    // ── calendar_update_inner ─────────────────────────────────────────────────
+
+    fn make_update(id: i64) -> UpdateEventPayload {
+        UpdateEventPayload {
+            id,
+            title: None,
+            event_type: None,
+            date: None,
+            start_time: None,
+            end_time: None,
+            duration_minutes: None,
+            color: None,
+            notes: None,
+            task_id: None,
+            reminder_minutes: None,
+        }
+    }
+
+    /// `calendar_update_inner` on a missing event ID must return `Err`.
+    #[test]
+    fn command_update_missing_id_returns_err() {
+        let (_dir, db) = test_db();
+        let mut p = make_update(9999);
+        p.title = Some("Ghost".to_string());
+        let err = calendar_update_inner(p, &db).unwrap_err();
+        assert!(err.contains("9999"), "error must mention the id: {err}");
+    }
+
+    /// `calendar_update_inner` with an invalid date must return `Err` before
+    /// touching the DB.
+    #[test]
+    fn command_update_invalid_date_returns_err() {
+        let (_dir, db) = test_db();
+        let evt = calendar_create_inner(make_event("2025-08-01"), &db).unwrap();
+        let mut p = make_update(evt.id);
+        p.date = Some("not-a-date".to_string());
+        let err = calendar_update_inner(p, &db).unwrap_err();
+        assert!(err.contains("not-a-date") || err.contains("YYYY"), "{err}");
+    }
+
+    /// `calendar_update_inner` with an invalid event type must return `Err`.
+    #[test]
+    fn command_update_invalid_event_type_returns_err() {
+        let (_dir, db) = test_db();
+        let evt = calendar_create_inner(make_event("2025-08-01"), &db).unwrap();
+        let mut p = make_update(evt.id);
+        p.event_type = Some("meeting".to_string());
+        let err = calendar_update_inner(p, &db).unwrap_err();
+        assert!(err.contains("meeting") || err.contains("Invalid"), "{err}");
+    }
+
+    /// `calendar_update_inner` with no fields set must return the current event
+    /// (no-op path).
+    #[test]
+    fn command_update_no_fields_returns_current_event() {
+        let (_dir, db) = test_db();
+        let evt = calendar_create_inner(make_event("2025-08-01"), &db).unwrap();
+        let result = calendar_update_inner(make_update(evt.id), &db).unwrap();
+        assert_eq!(result.id, evt.id);
+        assert_eq!(result.title, "Contract test");
+    }
+
+    /// `calendar_update_inner` with a valid patch must persist and return the
+    /// updated fields.
+    #[test]
+    fn command_update_valid_patch_persists() {
+        let (_dir, db) = test_db();
+        let evt = calendar_create_inner(make_event("2025-08-01"), &db).unwrap();
+        let mut p = make_update(evt.id);
+        p.title = Some("Updated title".to_string());
+        p.date  = Some("2025-09-15".to_string());
+        let result = calendar_update_inner(p, &db).unwrap();
+        assert_eq!(result.title, "Updated title");
+        assert_eq!(result.date,  "2025-09-15");
+        // Rescheduled — notified must be reset to 0
+        assert_eq!(result.notified, Some(0));
+    }
+
+    /// Updating `reminder_minutes` must reset `notified` to 0.
+    #[test]
+    fn command_update_reminder_resets_notified() {
+        let (_dir, db) = test_db();
+        let evt = calendar_create_inner(make_event("2025-08-01"), &db).unwrap();
+        // Mark notified first
+        mark_notified(&db, evt.id);
+        // Now update reminder → should reset notified
+        let mut p = make_update(evt.id);
+        p.reminder_minutes = Some(30);
+        let result = calendar_update_inner(p, &db).unwrap();
+        assert_eq!(result.notified, Some(0), "notified must be reset after reminder change");
     }
 }

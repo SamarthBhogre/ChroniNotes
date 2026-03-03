@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.4.0] - 2026-03-03
+
+### Fixed
+
+- **Notes — difficulty cannot be cleared:** Added `MaybeUpdate<T>` enum in backend to distinguish absent / null / value; frontend now sends `difficulty: null` to clear
+- **Notes — drag-and-drop cross-parent desync:** New `notes_move` backend command physically relocates files; frontend waits for backend confirmation before refreshing the tree (IDs are file paths, so they change on move)
+- **Notes — same-parent reorder not persisted:** `reorderNote` now writes updated `sortOrder` to disk for all affected siblings
+- **Tasks — optimistic update has no rollback:** `updateStatus`, `handleDrop`, and `onStatusChange` now capture a snapshot before mutation and restore it on IPC failure
+- **About modal — hardcoded version string:** Version is now injected at build time from root `package.json` via Vite `define`; no more manual edits
+- **Loading screen logo off-centre:** Removed fixed `width: 88px; height: 88px` from `.ws-logo` wrapper that was clipping the larger logo; now uses flexbox centering
+
+### Added
+
+- **BrandLogo component:** Reusable `<BrandLogo>` using Sora font weight-800 with `background-clip: text` gradient fill; two variants (`plain` / `gradient`); fully theme-aware via `--logo-grad-start` / `--logo-grad-end` CSS tokens (tuned for all 5 themes)
+- **Sora font:** Added Google Fonts `Sora:wght@800` import for logo typography
+- **23 backend tests for notes commands:** `MaybeUpdate` deserialization, difficulty set/clear/absent, tags roundtrip, `sortOrder` persistence, `notes_move` success and rejection cases, `scan_dir` correctness, path traversal rejection (total: 91 tests)
+- **`VITE_APP_VERSION` build-time constant:** `vite.config.ts` reads root `package.json` version and injects it as `import.meta.env.VITE_APP_VERSION`
+- **TypeScript env type:** `frontend/src/types/env.d.ts` declares `VITE_APP_VERSION` on `ImportMetaEnv`
+
+### Changed
+
+- **Topbar:** Replaced hardcoded gradient `<div>C</div>` with `<BrandLogo size={22} />`
+- **WelcomeScreen:** Replaced ring + circle + "C" letter with `<BrandLogo size={108} animate />`; logo size bumped from 84 → 108 px
+- **About modal:** Replaced `✦` sparkle div with `<BrandLogo size={52} />`; logo size bumped from 42 → 52 px
+- **PageSkeleton:** Added `<BrandLogo variant="gradient" size={44} animate />` above the loading spinner
+
+---
+
 ## [2.3.0] - 2026-03-03
 
 ### Added
@@ -29,7 +57,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Footer hint displays selected count and keyboard shortcut while items are chosen
 
 **Notes — Folder view multi-select**
-- Select button added to the folder hero header; toggles card-level checkbox mode
+- Select button added to the folder hero header; toggles card-level checkbox modecod
 - Cards display a checkbox indicator in select mode; clicking toggles selection with accent highlight
 - Action bar appears below the hero with Select All, Select None, and Delete Selected controls
 - Delete Selected is greyed out until at least one card is selected

@@ -1,4 +1,5 @@
 import { useState } from "react"
+import BrandLogo from "../BrandLogo"
 
 interface TopbarProps {
   title?: string
@@ -92,13 +93,7 @@ export default function Topbar({ title = "ChroniNotes", onOpenSettings, onOpenAb
         </div>
 
         {/* App icon + name */}
-        <div style={{
-          width: "18px", height: "18px", borderRadius: "5px",
-          background: "linear-gradient(135deg, var(--accent), var(--glow-b))",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "10px", fontWeight: 700, color: "white",
-          boxShadow: "0 1px 6px var(--accent-glow)",
-        }}>C</div>
+        <BrandLogo size={22} />
         <span style={{ fontSize: "12px", letterSpacing: "-0.1px" }}>{title}</span>
       </div>
 

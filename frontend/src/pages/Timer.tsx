@@ -263,7 +263,9 @@ export default function Timer() {
   useEffect(() => { loadSettings() }, [])
   useEffect(() => { setWorkInput(workMinutes); setBreakInput(breakMinutes) }, [workMinutes, breakMinutes])
   useEffect(() => { setCustomInput(customMinutes) }, [customMinutes])
-  useEffect(() => { window.electron.on("timer:update", updateFromMain) }, [])
+  useEffect(() => {
+    return window.electron.on("timer:update", updateFromMain as (data: unknown) => void)
+  }, [])
 
   const isBreak = tool === "pomodoro" && isRunning && mode === "break"
 

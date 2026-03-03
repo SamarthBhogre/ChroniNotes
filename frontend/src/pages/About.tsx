@@ -1,10 +1,16 @@
 import { useState } from "react"
+import BrandLogo from "../components/BrandLogo"
 
 interface AboutProps {
   onClose: () => void
 }
 
-const APP_VERSION = "2.1.1"
+/**
+ * APP_VERSION is injected at build time by vite.config.ts from the root
+ * package.json.  This is the single authoritative source — it matches
+ * tauri.conf.json and Cargo.toml.
+ */
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "2.3.0"
 const BUILD_YEAR  = "2026"
 
 /* ── All keyboard shortcuts / commands ── */
@@ -118,14 +124,7 @@ export default function About({ onClose }: AboutProps) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               {/* Logo */}
-              <div style={{
-                width: "42px", height: "42px", borderRadius: "12px",
-                background: "linear-gradient(135deg, var(--glow-a, var(--accent)), var(--glow-b, var(--accent)))",
-                boxShadow: "0 0 20px var(--accent-glow)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "18px", color: "white", fontWeight: 800,
-                animation: "floatY 4s ease-in-out infinite",
-              }}>✦</div>
+              <BrandLogo size={52} />
               <div>
                 <h2 style={{
                   fontSize: "1.2rem", fontWeight: 700, letterSpacing: "-0.3px",

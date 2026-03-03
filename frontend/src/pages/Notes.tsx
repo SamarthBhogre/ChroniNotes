@@ -82,8 +82,8 @@ export default function Notes() {
           ))}
         </div>
 
-        {/* New page button */}
-        <button onClick={() => createNote(null)} title="New page" style={{
+        {/* New page button — creates inside active folder if one is open */}
+        <button onClick={() => createNote(activeNote?.isFolder ? activeNote.id : null)} title="New page" style={{
           height: "26px", padding: "0 10px", borderRadius: "7px", flexShrink: 0,
           background: "var(--accent-dim)", border: "1px solid var(--accent-border)",
           color: "var(--accent)", fontSize: "11px", fontWeight: 700,
@@ -132,7 +132,7 @@ export default function Notes() {
               allNotes={notes}
               childNotes={notes.filter(n => n.parentId === activeNote.id).sort((a, b) => a.sortOrder - b.sortOrder)}
               onOpenNote={id => useNotesStore.getState().setActiveNote(id)}
-              onCreateNote={() => createNote(activeNote.id)}
+              onCreateNote={() => createNote(activeNote.id, false)}
               onCreateFolder={() => useNotesStore.getState().createFolder(activeNote.id)}
             />
           ) : (
@@ -242,6 +242,8 @@ function FolderView({ note, allNotes, childNotes, onOpenNote, onCreateNote, onCr
   const [selected, setSelected]     = useState<Set<string>>(new Set())
   const [selectMode, setSelectMode] = useState(false)
   const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  // Shift+click: enter select mode + toggle the item in one gesture
+  const shiftSelect  = (id: string) => { setSelectMode(true); setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   const clearSel     = () => { setSelected(new Set()); setSelectMode(false) }
   const selectAll    = () => setSelected(new Set(childNotes.map(n => n.id)))
   const massDelete   = () => { selected.forEach(id => deleteNote(id)); clearSel() }
@@ -249,7 +251,13 @@ function FolderView({ note, allNotes, childNotes, onOpenNote, onCreateNote, onCr
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape") clearSel()
-      if (selectMode && (e.key === "Delete" || e.key === "Backspace") && selected.size > 0) { e.preventDefault(); massDelete() }
+      // Delete works whenever items are selected — no need to toggle select mode first
+      if (selected.size > 0 && (e.key === "Delete" || e.key === "Backspace")) {
+        const tag = (e.target as HTMLElement).tagName
+        if (tag === "INPUT" || tag === "TEXTAREA") return
+        e.preventDefault()
+        massDelete()
+      }
     }
     window.addEventListener("keydown", h)
     return () => window.removeEventListener("keydown", h)
@@ -319,7 +327,7 @@ function FolderView({ note, allNotes, childNotes, onOpenNote, onCreateNote, onCr
                 selectMode={selectMode}
                 onPointerDown={e => startCardDrag(child.id, child.title, e)}
                 ref={el => registerCard(child.id, el)}
-                onClick={() => selectMode ? toggleSelect(child.id) : onOpenNote(child.id)}
+                onClick={e => e.shiftKey ? shiftSelect(child.id) : selectMode ? toggleSelect(child.id) : onOpenNote(child.id)}
               />
             ))}
           </div>
@@ -339,7 +347,7 @@ function FolderView({ note, allNotes, childNotes, onOpenNote, onCreateNote, onCr
                 selectMode={selectMode}
                 onPointerDown={e => startCardDrag(child.id, child.title, e)}
                 ref={el => registerCard(child.id, el)}
-                onClick={() => selectMode ? toggleSelect(child.id) : onOpenNote(child.id)}
+                onClick={e => e.shiftKey ? shiftSelect(child.id) : selectMode ? toggleSelect(child.id) : onOpenNote(child.id)}
               />
             ))}
           </div>
@@ -377,7 +385,7 @@ interface CardProps {
   note: any; isOver: boolean; isDragging: boolean
   isSelected: boolean; selectMode: boolean
   onPointerDown: (e: React.PointerEvent) => void
-  onClick: () => void
+  onClick: (e: React.MouseEvent) => void
 }
 
 const FolderCard = forwardRef<HTMLDivElement, CardProps & { childCount: number }>(
