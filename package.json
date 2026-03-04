@@ -1,6 +1,6 @@
 {
   "name": "chroninotes",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Offline-first desktop productivity assistant for students",
   "private": true,
   "scripts": {
