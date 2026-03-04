@@ -35,7 +35,7 @@ jobs:
         run: cd frontend && npm install
 
       - name: Build Tauri app
-        run: npm run build
+        run: npx tauri build
 
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
@@ -77,7 +77,7 @@ jobs:
         run: cd frontend && npm install
 
       - name: Build Tauri app (Intel)
-        run: npm run build -- -- --target x86_64-apple-darwin
+        run: npx tauri build --target x86_64-apple-darwin
 
       - name: Rename DMG for clarity
         run: |
@@ -120,7 +120,7 @@ jobs:
         run: cd frontend && npm install
 
       - name: Build Tauri app (Apple Silicon)
-        run: npm run build -- -- --target aarch64-apple-darwin
+        run: npx tauri build --target aarch64-apple-darwin
 
       - name: Rename DMG for clarity
         run: |

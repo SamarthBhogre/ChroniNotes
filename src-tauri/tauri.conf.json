@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ChorniNotes",
+  "productName": "ChroniNotes",
   "version": "2.5.0",
   "identifier": "com.chroninotes.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ChorniNotes",
+        "title": "ChroniNotes",
         "label": "main",
         "width": 1200,
         "height": 800,
