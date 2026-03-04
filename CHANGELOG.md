@@ -14,11 +14,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Cross-platform self-updater:** `updater_check` now detects the running OS and CPU architecture at compile time and picks the correct release asset (`.exe` on Windows, `_aarch64.dmg` or `_x64.dmg` on macOS)
 - **macOS DMG installer launch:** `updater_download_and_install` uses `open` to mount the downloaded `.dmg` on macOS instead of the Windows-only `ShellExecuteW` UAC elevation path
 
+### Fixed
+
+- **`productName` typo:** Corrected `"ChorniNotes"` → `"ChroniNotes"` in `tauri.conf.json`; the macOS bundler lowercases `productName` to locate the compiled binary (`chorninotes` ≠ `chroninotes`), causing a "No such file or directory" bundling failure — Windows was unaffected because the NSIS bundler resolves the binary path differently
+- **CI target passthrough:** Replaced `npm run build -- -- --target` with direct `npx tauri build --target` calls; the double `--` npm passthrough was silently dropping the `--target` flag so cross-compile builds fell back to native
+
 ### Changed
 
 - **Installer name validation:** `validate_installer_name` now accepts both `.exe` and `.dmg` extensions (was `.exe`-only)
 - **Release workflow:** The `release` job now depends on `build-windows`, `build-macos-intel`, and `build-macos-arm`; all artifacts (NSIS `.exe`, `.msi`, Intel `.dmg`, ARM `.dmg`) are published in a single GitHub Release
 - **DMG naming convention:** Intel builds are suffixed `_x64.dmg`, Apple Silicon builds `_aarch64.dmg` for unambiguous identification
+- **macOS CI runner:** Uses `macos-latest` (Apple Silicon) for both Intel and ARM builds; Intel target cross-compiles via `--target x86_64-apple-darwin` (`macos-13` was retired by GitHub)
 
 ---
 
