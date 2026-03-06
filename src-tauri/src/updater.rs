@@ -110,18 +110,17 @@ fn validate_download_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Allow only a plain filename with a valid installer extension; reject
-/// anything containing path separators or other shell-significant characters
-/// so we cannot be tricked into writing outside of `std::env::temp_dir()`.
+/// Allow only a plain filename with a `.exe` extension; reject anything
+/// containing path separators or other shell-significant characters so we
+/// cannot be tricked into writing outside of `std::env::temp_dir()`.
 fn validate_installer_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("Installer name must not be empty".to_string());
     }
 
-    // Must end with a known installer extension
-    let lower = name.to_ascii_lowercase();
-    if !lower.ends_with(".exe") && !lower.ends_with(".dmg") {
-        return Err("Installer must be a .exe or .dmg file".to_string());
+    // Must end with .exe (Windows installer)
+    if !name.to_ascii_lowercase().ends_with(".exe") {
+        return Err("Installer must be a .exe file".to_string());
     }
 
     // No path components or shell-significant characters
@@ -171,27 +170,12 @@ pub async fn updater_check() -> Result<UpdateInfo, String> {
         .await
         .map_err(|e| format!("Failed to parse release JSON: {}", e))?;
 
-    // Find the appropriate installer asset for the current platform
-    let installer_asset = if cfg!(target_os = "macos") {
-        // On macOS, look for the .dmg matching the current architecture
-        let arch_suffix = if cfg!(target_arch = "aarch64") {
-            "_aarch64.dmg"
-        } else {
-            "_x64.dmg"
-        };
-        release
-            .assets
-            .iter()
-            .find(|a| a.name.ends_with(arch_suffix))
-            .or_else(|| release.assets.iter().find(|a| a.name.ends_with(".dmg")))
-    } else {
-        // On Windows, find the NSIS .exe installer asset
-        release
-            .assets
-            .iter()
-            .find(|a| a.name.ends_with(".exe") && !a.name.contains("debug"))
-            .or_else(|| release.assets.iter().find(|a| a.name.ends_with(".exe")))
-    };
+    // Find the NSIS .exe installer asset
+    let installer_asset = release
+        .assets
+        .iter()
+        .find(|a| a.name.ends_with(".exe") && !a.name.contains("debug"))
+        .or_else(|| release.assets.iter().find(|a| a.name.ends_with(".exe")));
 
     let (download_url, installer_name, installer_size) = match installer_asset {
         Some(asset) => (
@@ -337,16 +321,7 @@ pub async fn updater_download_and_install(
         }
     }
 
-    // On macOS, open the DMG with the default handler (DiskImageMounter)
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(&installer_path)
-            .spawn()
-            .map_err(|e| format!("Failed to open DMG: {}", e))?;
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    #[cfg(not(target_os = "windows"))]
     {
         std::process::Command::new(&installer_path)
             .spawn()
