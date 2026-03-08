@@ -49,8 +49,7 @@ const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// by the GitHub API's browser_download_url field always has this form:
 ///   https://github.com/<owner>/<repo>/releases/download/<tag>/<file>
 const ALLOWED_DOWNLOAD_HOST: &str = "github.com";
-const ALLOWED_DOWNLOAD_PATH_PREFIX: &str =
-    "/SamarthBhogre/ChroniNotes/releases/download/";
+const ALLOWED_DOWNLOAD_PATH_PREFIX: &str = "/SamarthBhogre/ChroniNotes/releases/download/";
 
 // ─── Version helpers ─────────────────────────────────────────────────────────
 
@@ -118,14 +117,16 @@ fn validate_installer_name(name: &str) -> Result<(), String> {
         return Err("Installer name must not be empty".to_string());
     }
 
-    // Must end with a known installer extension
+    // Must end with a known installer extension (Windows only)
     let lower = name.to_ascii_lowercase();
-    if !lower.ends_with(".exe") && !lower.ends_with(".dmg") {
-        return Err("Installer must be a .exe or .dmg file".to_string());
+    if !lower.ends_with(".exe") && !lower.ends_with(".msi") {
+        return Err("Installer must be a .exe or .msi file".to_string());
     }
 
     // No path components or shell-significant characters
-    let forbidden = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '\0', ';', '&', '$'];
+    let forbidden = [
+        '/', '\\', ':', '*', '?', '"', '<', '>', '|', '\0', ';', '&', '$',
+    ];
     if name.chars().any(|c| forbidden.contains(&c)) {
         return Err("Installer name contains forbidden characters".to_string());
     }
@@ -160,10 +161,7 @@ pub async fn updater_check() -> Result<UpdateInfo, String> {
         .map_err(|e| format!("Failed to fetch release info: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!(
-            "GitHub API returned status {}",
-            response.status()
-        ));
+        return Err(format!("GitHub API returned status {}", response.status()));
     }
 
     let release: GitHubRelease = response
@@ -171,27 +169,12 @@ pub async fn updater_check() -> Result<UpdateInfo, String> {
         .await
         .map_err(|e| format!("Failed to parse release JSON: {}", e))?;
 
-    // Find the appropriate installer asset for the current platform
-    let installer_asset = if cfg!(target_os = "macos") {
-        // On macOS, look for the .dmg matching the current architecture
-        let arch_suffix = if cfg!(target_arch = "aarch64") {
-            "_aarch64.dmg"
-        } else {
-            "_x64.dmg"
-        };
-        release
-            .assets
-            .iter()
-            .find(|a| a.name.ends_with(arch_suffix))
-            .or_else(|| release.assets.iter().find(|a| a.name.ends_with(".dmg")))
-    } else {
-        // On Windows, find the NSIS .exe installer asset
-        release
-            .assets
-            .iter()
-            .find(|a| a.name.ends_with(".exe") && !a.name.contains("debug"))
-            .or_else(|| release.assets.iter().find(|a| a.name.ends_with(".exe")))
-    };
+    // Find the appropriate installer asset (Windows .exe only)
+    let installer_asset = release
+        .assets
+        .iter()
+        .find(|a| a.name.ends_with(".exe") && !a.name.contains("debug"))
+        .or_else(|| release.assets.iter().find(|a| a.name.ends_with(".exe")));
 
     let (download_url, installer_name, installer_size) = match installer_asset {
         Some(asset) => (
@@ -295,20 +278,78 @@ pub async fn updater_download_and_install(
     );
 
     // Launch the installer with UAC elevation (Windows only)
+    //
+    // The NSIS installer needs the current ChroniNotes process to be fully
+    // terminated before it can replace the executable.  We pass `/S` for
+    // silent mode so the user isn't prompted twice (they already confirmed
+    // in the UI).  We also pass `/D=<install_dir>` so NSIS installs over
+    // the existing installation rather than prompting for a new directory.
+    //
+    // The helper batch script:
+    //  1. Polls until our PID no longer exists (process fully exited)
+    //  2. Launches the NSIS installer with /S and /D=<install_dir>
+    //  3. Deletes itself
+    //
+    // We then exit the app so files are unlocked for NSIS.
     #[cfg(target_os = "windows")]
     {
         use std::ffi::OsStr;
         use std::os::windows::ffi::OsStrExt;
 
-        let operation: Vec<u16> = OsStr::new("runas")
+        // Detect the current installation directory from the running executable.
+        // e.g. C:\Users\<user>\AppData\Local\ChorniNotes\
+        let install_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
+            .unwrap_or_default();
+
+        let pid = std::process::id();
+        let batch_content = if install_dir.is_empty() {
+            // Fallback: no /D= flag, let NSIS use its default
+            format!(
+                "@echo off\r\n\
+                 :wait\r\n\
+                 tasklist /fi \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL\r\n\
+                 if not errorlevel 1 (\r\n\
+                   timeout /t 1 /nobreak >NUL\r\n\
+                   goto wait\r\n\
+                 )\r\n\
+                 start \"\" \"{installer}\" /S\r\n\
+                 del \"%~f0\"\r\n",
+                pid = pid,
+                installer = installer_path.to_string_lossy(),
+            )
+        } else {
+            format!(
+                "@echo off\r\n\
+                 :wait\r\n\
+                 tasklist /fi \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL\r\n\
+                 if not errorlevel 1 (\r\n\
+                   timeout /t 1 /nobreak >NUL\r\n\
+                   goto wait\r\n\
+                 )\r\n\
+                 start \"\" \"{installer}\" /S /D={dir}\r\n\
+                 del \"%~f0\"\r\n",
+                pid = pid,
+                installer = installer_path.to_string_lossy(),
+                dir = install_dir,
+            )
+        };
+
+        let batch_path = temp_dir.join("chroninotes_update.bat");
+        std::fs::write(&batch_path, &batch_content)
+            .map_err(|e| format!("Failed to write updater script: {}", e))?;
+
+        let operation: Vec<u16> = OsStr::new("open")
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
-        let file_wide: Vec<u16> = OsStr::new(&installer_path)
+        let file_wide: Vec<u16> = OsStr::new("cmd.exe")
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
-        let parameters: Vec<u16> = OsStr::new("")
+        let params_str = format!("/c \"{}\"", batch_path.to_string_lossy());
+        let parameters: Vec<u16> = OsStr::new(&params_str)
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
@@ -324,40 +365,28 @@ pub async fn updater_download_and_install(
                 file_wide.as_ptr(),
                 parameters.as_ptr(),
                 directory.as_ptr(),
-                windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+                windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE,
             )
         };
 
         // ShellExecuteW returns a value > 32 on success
         if (result as isize) <= 32 {
             return Err(format!(
-                "Failed to launch installer with elevation (ShellExecute returned {})",
+                "Failed to launch updater script (ShellExecute returned {})",
                 result as isize
             ));
         }
     }
 
-    // On macOS, open the DMG with the default handler (DiskImageMounter)
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(&installer_path)
-            .spawn()
-            .map_err(|e| format!("Failed to open DMG: {}", e))?;
-    }
+    log::info!(
+        "[Updater] Updater helper launched. Closing app immediately so files are unlocked..."
+    );
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        std::process::Command::new(&installer_path)
-            .spawn()
-            .map_err(|e| format!("Failed to launch installer: {}", e))?;
-    }
-
-    log::info!("[Updater] Installer launched. Closing app...");
-
-    // Give the frontend a moment to show a final message before we exit
+    // Exit immediately so the NSIS installer (launched by the helper script
+    // after this process terminates) can replace the executable without
+    // file-locking conflicts.
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(1500));
+        std::thread::sleep(std::time::Duration::from_millis(500));
         std::process::exit(0);
     });
 

@@ -6,6 +6,9 @@ export type ThemeId =
   | "warm-linen"
   | "ember"
   | "carbon"
+  | "black-red"
+  | "smooth-blues"
+  | "warm-red-blue"
 
 export interface ThemeMeta {
   id: ThemeId
@@ -49,6 +52,27 @@ export const THEMES: ThemeMeta[] = [
     name: "Carbon",
     description: "Dark navy with teal accent and blue-grey tones",
     swatches: ["#d8dbe2", "#a9bcd0", "#58a4b0", "#373f51", "#1b1b1e"],
+    isDark: true,
+  },
+  {
+    id: "black-red",
+    name: "Black & Red",
+    description: "High-contrast dark with vivid red accents",
+    swatches: ["#111111", "#161616", "#1C1C1C", "#E31C25", "#BB000E"],
+    isDark: true,
+  },
+  {
+    id: "smooth-blues",
+    name: "Smooth Blues",
+    description: "Deep ocean blues with bright cyan highlights",
+    swatches: ["#0945B4", "#0C59AF", "#0B6DC2", "#1187D7", "#0A1628"],
+    isDark: true,
+  },
+  {
+    id: "warm-red-blue",
+    name: "Warm Red & Blue",
+    description: "Bold dual-accent — red accents, blue-purple glass, twin duality",
+    swatches: ["#E53030", "#D50000", "#8030C0", "#3168B9", "#100C16"],
     isDark: true,
   },
 ]

@@ -509,6 +509,9 @@ export default function Timer() {
             {tool === "stopwatch" && (
               <StopwatchPanel seconds={seconds} isRunning={isRunning} isPaused={isPaused} />
             )}
+
+            {/* Focus Records */}
+            <FocusRecords />
           </div>
         </div>
       </div>
@@ -835,6 +838,83 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
         fontFamily: "'JetBrains Mono', monospace",
         color: accent ? "var(--accent)" : "var(--text-primary)",
       }}>{value}</span>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════
+   FOCUS RECORDS — Recent session history
+════════════════════════════════════ */
+function FocusRecords() {
+  const [history, setHistory] = useState<{ date: string; count: number; total_seconds: number }[]>([])
+  const [todayMin, setTodayMin] = useState(0)
+
+  useEffect(() => {
+    window.electron.invoke("focus:history")
+      .then(d => setHistory((d as { date: string; count: number; total_seconds: number }[]).slice(-14).reverse()))
+      .catch(() => {})
+    window.electron.invoke("focus:todayMinutes")
+      .then(d => setTodayMin(d as number))
+      .catch(() => {})
+  }, [])
+
+  const totalSessions = history.reduce((s, d) => s + d.count, 0)
+  const totalMinutes = history.reduce((s, d) => s + Math.round(d.total_seconds / 60), 0)
+
+  return (
+    <>
+      <div style={{ height: "1px", background: "var(--glass-border)" }} />
+      <div>
+        <FieldLabel>Focus Records</FieldLabel>
+
+        {/* Summary stats */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px",
+        }}>
+          <MiniStatBox label="Today" value={`${todayMin}m`} accent />
+          <MiniStatBox label="Sessions" value={String(totalSessions)} />
+          <MiniStatBox label="Total" value={`${totalMinutes}m`} />
+        </div>
+
+        {/* Recent days */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "3px", maxHeight: "140px", overflowY: "auto" }}>
+          {history.length === 0 ? (
+            <div style={{ fontSize: "10px", color: "var(--text-tertiary)", textAlign: "center", padding: "12px 0" }}>
+              No focus sessions yet
+            </div>
+          ) : history.map(d => {
+            const mins = Math.round(d.total_seconds / 60)
+            return (
+              <div key={d.date} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "4px 8px", borderRadius: "6px",
+                fontSize: "10px",
+              }}>
+                <span style={{ color: "var(--text-tertiary)" }}>
+                  {new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })}
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>{d.count} session{d.count !== 1 ? "s" : ""}</span>
+                  <span style={{ fontWeight: 700, color: "var(--accent)", minWidth: "36px", textAlign: "right" }}>{mins}m</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function MiniStatBox({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div style={{
+      padding: "6px 8px", borderRadius: "8px", textAlign: "center",
+      background: accent ? "var(--accent-dim)" : "var(--glass-bg)",
+      border: `1px solid ${accent ? "var(--accent-border)" : "var(--glass-border)"}`,
+    }}>
+      <div style={{ fontSize: "13px", fontWeight: 700, color: accent ? "var(--accent)" : "var(--text-primary)" }}>{value}</div>
+      <div style={{ fontSize: "8px", color: "var(--text-tertiary)", marginTop: "1px" }}>{label}</div>
     </div>
   )
 }

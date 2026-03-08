@@ -15,8 +15,10 @@ const Tasks     = lazy(() => import("./pages/Tasks"))
 const Notes     = lazy(() => import("./pages/Notes"))
 const Timer     = lazy(() => import("./pages/Timer"))
 const Calendar  = lazy(() => import("./pages/Calendar"))
+const Habits    = lazy(() => import("./pages/Habits"))
+const Countdown = lazy(() => import("./pages/Countdown"))
 
-type Page = "dashboard" | "tasks" | "notes" | "timer" | "calendar"
+type Page = "dashboard" | "tasks" | "notes" | "timer" | "calendar" | "habits" | "countdown"
 
 function PageSkeleton() {
   return (
@@ -31,7 +33,7 @@ function PageSkeleton() {
   )
 }
 
-const PAGES: Page[] = ["dashboard", "tasks", "notes", "timer", "calendar"]
+const PAGES: Page[] = ["dashboard", "tasks", "notes", "timer", "calendar", "habits", "countdown"]
 
 export default function App() {
   const [page, setPage]                 = useState<Page>("dashboard")
@@ -116,6 +118,8 @@ export default function App() {
                   {p === "notes"     && <Notes />}
                   {p === "timer"     && <Timer />}
                   {p === "calendar"  && <Calendar />}
+                  {p === "habits"    && <Habits />}
+                  {p === "countdown" && <Countdown />}
                 </Suspense>
               </div>
             )

@@ -36,6 +36,9 @@ jobs:
 
       - name: Build Tauri app
         run: npx tauri build
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
 
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
@@ -49,94 +52,8 @@ jobs:
           name: chroninotes-msi-installer
           path: src-tauri/target/release/bundle/msi/*.msi
 
-  build-macos-intel:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-apple-darwin
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install root dependencies
-        run: npm install
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm install
-
-      - name: Build Tauri app (Intel)
-        run: npx tauri build --target x86_64-apple-darwin
-
-      - name: Rename DMG for clarity
-        run: |
-          cd src-tauri/target/x86_64-apple-darwin/release/bundle/dmg
-          for f in *.dmg; do
-            mv "$f" "${f%.dmg}_x64.dmg"
-          done
-
-      - name: Upload DMG (Intel)
-        uses: actions/upload-artifact@v4
-        with:
-          name: chroninotes-dmg-intel
-          path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*_x64.dmg
-
-  build-macos-arm:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install root dependencies
-        run: npm install
-
-      - name: Install frontend dependencies
-        run: cd frontend && npm install
-
-      - name: Build Tauri app (Apple Silicon)
-        run: npx tauri build --target aarch64-apple-darwin
-
-      - name: Rename DMG for clarity
-        run: |
-          cd src-tauri/target/aarch64-apple-darwin/release/bundle/dmg
-          for f in *.dmg; do
-            mv "$f" "${f%.dmg}_aarch64.dmg"
-          done
-
-      - name: Upload DMG (Apple Silicon)
-        uses: actions/upload-artifact@v4
-        with:
-          name: chroninotes-dmg-arm
-          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*_aarch64.dmg
-
   release:
-    needs: [build-windows, build-macos-intel, build-macos-arm]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Download NSIS artifact
@@ -149,18 +66,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: chroninotes-msi-installer
-          path: ./installers
-
-      - name: Download macOS Intel DMG
-        uses: actions/download-artifact@v4
-        with:
-          name: chroninotes-dmg-intel
-          path: ./installers
-
-      - name: Download macOS ARM DMG
-        uses: actions/download-artifact@v4
-        with:
-          name: chroninotes-dmg-arm
           path: ./installers
 
       - name: Create GitHub Release

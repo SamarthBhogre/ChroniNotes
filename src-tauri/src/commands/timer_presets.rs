@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use rusqlite::params;
-use tauri::State;
 use crate::db::Database;
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use tauri::State;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TimerPreset {
@@ -26,7 +26,9 @@ fn validate_name(name: &str) -> Result<(), String> {
 
 fn validate_duration(d: i64) -> Result<(), String> {
     if d < 1 || d > 1440 {
-        return Err(format!("duration_minutes must be between 1 and 1440, got {d}"));
+        return Err(format!(
+            "duration_minutes must be between 1 and 1440, got {d}"
+        ));
     }
     Ok(())
 }
@@ -43,18 +45,19 @@ pub fn timer_presets_list(db: State<Database>) -> Result<Vec<TimerPreset>, Strin
         )
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(TimerPreset {
-            id:               row.get(0)?,
-            name:             row.get(1)?,
-            duration_minutes: row.get(2)?,
-            is_favorite:      row.get(3)?,
-            created_at:       row.get(4)?,
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(TimerPreset {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                duration_minutes: row.get(2)?,
+                is_favorite: row.get(3)?,
+                created_at: row.get(4)?,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string());
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
     rows
 }
 
@@ -76,7 +79,13 @@ pub fn timer_presets_create(
     )
     .map_err(|e| e.to_string())?;
     let id = conn.last_insert_rowid();
-    Ok(TimerPreset { id, name, duration_minutes, is_favorite: fav, created_at: None })
+    Ok(TimerPreset {
+        id,
+        name,
+        duration_minutes,
+        is_favorite: fav,
+        created_at: None,
+    })
 }
 
 #[tauri::command]
@@ -109,7 +118,7 @@ pub fn timer_presets_update(
 
 #[tauri::command]
 pub fn timer_presets_delete(id: i64, db: State<Database>) -> Result<(), String> {
-    let conn     = db.conn().lock().map_err(|e| e.to_string())?;
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
     let affected = conn
         .execute("DELETE FROM timer_presets WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
@@ -122,7 +131,7 @@ pub fn timer_presets_delete(id: i64, db: State<Database>) -> Result<(), String> 
 
 #[tauri::command]
 pub fn timer_presets_toggle_favorite(id: i64, db: State<Database>) -> Result<(), String> {
-    let conn     = db.conn().lock().map_err(|e| e.to_string())?;
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
     let affected = conn
         .execute(
             "UPDATE timer_presets SET is_favorite = 1 - is_favorite WHERE id = ?1",

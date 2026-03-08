@@ -293,6 +293,185 @@
   --topbar-bg: rgba(27, 27, 30, 0.92);
 }
 
+/* ─────────────────────────────────────
+   THEME 6 — Black & Red
+   High-contrast dark · vivid red accent
+   Palette: #111111 · #161616 · #1C1C1C · #E31C25 · #BB000E
+───────────────────────────────────── */
+[data-theme="black-red"] {
+  --bg-base: #0a0a0a;
+  --bg-surface: #111111;
+  --modal-bg: rgba(11, 11, 11, 0.97);
+
+  --glass-bg: rgba(227, 28, 37, 0.06);
+  --glass-bg-hover: rgba(227, 28, 37, 0.11);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-border-strong: rgba(255, 255, 255, 0.16);
+  --glass-blur: blur(20px) saturate(150%);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.7);
+
+  --accent: #E31C25;
+  --accent-dim: rgba(227, 28, 37, 0.14);
+  --accent-border: rgba(227, 28, 37, 0.32);
+  --accent-glow: rgba(227, 28, 37, 0.25);
+  --glow-a: #E31C25;
+  --glow-b: #BB000E;
+  --glow-c: #1C1C1C;
+
+  --logo-grad-start: #E31C25;
+  --logo-grad-end:   #BB000E;
+
+  --text-primary: rgba(255, 255, 255, 0.93);
+  --text-secondary: rgba(255, 255, 255, 0.52);
+  --text-tertiary: rgba(255, 255, 255, 0.26);
+  --text-placeholder: rgba(255, 255, 255, 0.18);
+
+  --color-green: #4ade80;
+  --color-blue: #60a5fa;
+  --color-pink: #f472b6;
+  --color-yellow: #fbbf24;
+  --color-red: #E31C25;
+
+  --code-bg: #0d0d0d;
+  --code-border: rgba(227, 28, 37, 0.28);
+  --code-text: #e8e8e8;
+  --code-muted: #666666;
+  --code-keyword: #E31C25;
+  --code-string: #f0a050;
+  --code-number: #ff6b6b;
+  --code-fn: #c8c8c8;
+  --code-type: #ffa0a0;
+  --code-class: #e0e0e0;
+  --code-variable: #cc4444;
+  --code-attr: #88cc88;
+
+  --sidebar-bg: rgba(10, 10, 10, 0.80);
+  --topbar-bg: rgba(11, 11, 11, 0.92);
+}
+
+/* ─────────────────────────────────────
+   THEME 7 — Smooth Blues
+   Deep ocean · bright blue accents
+   Palette: #0945B4 · #0C59AF · #0B6DC2 · #1187D7
+───────────────────────────────────── */
+[data-theme="smooth-blues"] {
+  --bg-base: #060d1e;
+  --bg-surface: #0a1628;
+  --modal-bg: rgba(6, 13, 30, 0.97);
+
+  --glass-bg: rgba(11, 109, 194, 0.08);
+  --glass-bg-hover: rgba(11, 109, 194, 0.14);
+  --glass-border: rgba(17, 135, 215, 0.16);
+  --glass-border-strong: rgba(17, 135, 215, 0.28);
+  --glass-blur: blur(20px) saturate(160%);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+  --accent: #1187D7;
+  --accent-dim: rgba(17, 135, 215, 0.14);
+  --accent-border: rgba(17, 135, 215, 0.35);
+  --accent-glow: rgba(17, 135, 215, 0.25);
+  --glow-a: #0945B4;
+  --glow-b: #0B6DC2;
+  --glow-c: #1187D7;
+
+  --logo-grad-start: #0C59AF;
+  --logo-grad-end:   #1187D7;
+
+  --text-primary: rgba(220, 230, 245, 0.94);
+  --text-secondary: rgba(160, 190, 220, 0.65);
+  --text-tertiary: rgba(140, 170, 200, 0.35);
+  --text-placeholder: rgba(140, 170, 200, 0.25);
+
+  --color-green: #34d399;
+  --color-blue: #1187D7;
+  --color-pink: #f472b6;
+  --color-yellow: #fbbf24;
+  --color-red: #f87171;
+
+  --code-bg: #050a18;
+  --code-border: rgba(11, 109, 194, 0.30);
+  --code-text: #d0ddf0;
+  --code-muted: #5580aa;
+  --code-keyword: #1187D7;
+  --code-string: #60c0e0;
+  --code-number: #80c0ff;
+  --code-fn: #90b8e8;
+  --code-type: #70a0d0;
+  --code-class: #b0d0f0;
+  --code-variable: #6090c0;
+  --code-attr: #50b080;
+
+  --sidebar-bg: rgba(5, 10, 24, 0.75);
+  --topbar-bg: rgba(6, 13, 30, 0.92);
+}
+
+/* ─────────────────────────────────────
+   THEME 8 — Warm Red & Blue
+   Bold dual-accent · warm red + deep blue twin
+   Red dominates accents/active states, blue dominates glass/surfaces
+   Palette: #D50000 · #E53030 · #3168B9 · #2247C1
+───────────────────────────────────── */
+[data-theme="warm-red-blue"] {
+  --bg-base: #0a0a10;
+  --bg-surface: #101018;
+  --modal-bg: rgba(10, 10, 16, 0.97);
+
+  /* Glass uses deep blue — blue is the "cool" twin on surfaces */
+  --glass-bg: rgba(34, 71, 193, 0.08);
+  --glass-bg-hover: rgba(34, 71, 193, 0.14);
+  --glass-border: rgba(49, 104, 185, 0.16);
+  --glass-border-strong: rgba(49, 104, 185, 0.28);
+  --glass-blur: blur(20px) saturate(170%);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.65);
+
+  /* Accent is RED — the "warm" twin on interactive elements */
+  --accent: #E53030;
+  --accent-dim: rgba(229, 48, 48, 0.12);
+  --accent-border: rgba(229, 48, 48, 0.30);
+  --accent-glow: rgba(229, 48, 48, 0.20);
+
+  /* Glow gradients: red → purple bridge → blue */
+  --glow-a: #D50000;
+  --glow-b: #7030B0;
+  --glow-c: #2247C1;
+
+  --logo-grad-start: #E53030;
+  --logo-grad-end:   #3168B9;
+
+  /* Neutral cool text — no pink, no blue bias */
+  --text-primary: rgba(230, 230, 235, 0.95);
+  --text-secondary: rgba(170, 175, 195, 0.62);
+  --text-tertiary: rgba(140, 145, 165, 0.36);
+  --text-placeholder: rgba(130, 135, 155, 0.25);
+
+  --color-green: #30d890;
+  --color-blue: #4080E0;
+  --color-pink: #f472b6;
+  --color-yellow: #f0b020;
+  --color-red: #E53030;
+
+  /* Code: red keywords, blue strings — the twin duality */
+  --code-bg: #08080e;
+  --code-border: rgba(49, 104, 185, 0.25);
+  --code-text: #d5d5de;
+  --code-muted: #606878;
+  --code-keyword: #E53030;
+  --code-string: #4080E0;
+  --code-number: #E87040;
+  --code-fn: #7090D0;
+  --code-type: #D06060;
+  --code-class: #B0B8D0;
+  --code-variable: #B04050;
+  --code-attr: #50A880;
+
+  /* Sidebar/topbar: neutral dark */
+  --sidebar-bg: rgba(8, 8, 14, 0.80);
+  --topbar-bg: rgba(10, 10, 16, 0.93);
+}
+
 /* ═══════════════════════════════════════
    SPACING / TYPOGRAPHY / RADIUS
    (theme-independent)

@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-use rusqlite::params;
-use tauri::State;
-use chrono::{NaiveDate, NaiveTime};
 use crate::db::Database;
+use chrono::{NaiveDate, NaiveTime};
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use tauri::State;
 
 /* ── Types ── */
 
@@ -104,10 +104,12 @@ fn validate_date(date: &str) -> Result<(), String> {
     // Stage 2: real calendar date check.
     NaiveDate::parse_from_str(date, "%Y-%m-%d")
         .map(|_| ())
-        .map_err(|_| format!(
-            "Date '{}' is not a valid calendar date (e.g. Feb 30 or month 13 are rejected)",
-            date
-        ))
+        .map_err(|_| {
+            format!(
+                "Date '{}' is not a valid calendar date (e.g. Feb 30 or month 13 are rejected)",
+                date
+            )
+        })
 }
 
 /// Validate a time string: accept HH:MM or HH:MM:SS with *exactly* two
@@ -167,24 +169,23 @@ fn validate_reminder(r: i64) -> Result<(), String> {
 
 fn row_to_event(row: &rusqlite::Row) -> rusqlite::Result<CalendarEvent> {
     Ok(CalendarEvent {
-        id:               row.get(0)?,
-        title:            row.get(1)?,
-        event_type:       row.get(2)?,
-        date:             row.get(3)?,
-        start_time:       row.get(4)?,
-        end_time:         row.get(5)?,
+        id: row.get(0)?,
+        title: row.get(1)?,
+        event_type: row.get(2)?,
+        date: row.get(3)?,
+        start_time: row.get(4)?,
+        end_time: row.get(5)?,
         duration_minutes: row.get(6)?,
-        color:            row.get(7)?,
-        notes:            row.get(8)?,
-        task_id:          row.get(9)?,
+        color: row.get(7)?,
+        notes: row.get(8)?,
+        task_id: row.get(9)?,
         reminder_minutes: row.get(10)?,
-        notified:         row.get(11)?,
-        created_at:       row.get(12)?,
+        notified: row.get(11)?,
+        created_at: row.get(12)?,
     })
 }
 
-const SELECT_COLS: &str =
-    "id, title, type, date, start_time, end_time, duration_minutes, \
+const SELECT_COLS: &str = "id, title, type, date, start_time, end_time, duration_minutes, \
      color, notes, task_id, reminder_minutes, notified, created_at";
 
 /* ── Commands ── */
@@ -203,10 +204,18 @@ pub(crate) fn calendar_create_inner(
     let event_type = event.event_type.unwrap_or_else(|| "event".to_string());
     validate_event_type(&event_type)?;
 
-    if let Some(ref t) = event.start_time { validate_time(t)?; }
-    if let Some(ref t) = event.end_time   { validate_time(t)?; }
-    if let Some(d) = event.duration_minutes { validate_duration(d)?; }
-    if let Some(r) = event.reminder_minutes { validate_reminder(r)?; }
+    if let Some(ref t) = event.start_time {
+        validate_time(t)?;
+    }
+    if let Some(ref t) = event.end_time {
+        validate_time(t)?;
+    }
+    if let Some(d) = event.duration_minutes {
+        validate_duration(d)?;
+    }
+    if let Some(r) = event.reminder_minutes {
+        validate_reminder(r)?;
+    }
 
     let color = event.color.unwrap_or_else(|| "accent".to_string());
 
@@ -223,10 +232,11 @@ pub(crate) fn calendar_create_inner(
     )
     .map_err(|e| e.to_string())?;
 
-    let id  = conn.last_insert_rowid();
+    let id = conn.last_insert_rowid();
     let sql = format!("SELECT {} FROM calendar_events WHERE id = ?1", SELECT_COLS);
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    stmt.query_row(params![id], row_to_event).map_err(|e| e.to_string())
+    stmt.query_row(params![id], row_to_event)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -252,7 +262,8 @@ pub fn calendar_list(
                 SELECT_COLS
             );
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-            let rows = stmt.query_map(params![pattern], row_to_event)
+            let rows = stmt
+                .query_map(params![pattern], row_to_event)
                 .map_err(|e| e.to_string())?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| e.to_string())?;
@@ -264,7 +275,8 @@ pub fn calendar_list(
                 SELECT_COLS
             );
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-            let rows = stmt.query_map([], row_to_event)
+            let rows = stmt
+                .query_map([], row_to_event)
                 .map_err(|e| e.to_string())?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| e.to_string())?;
@@ -281,12 +293,13 @@ pub fn calendar_list_by_date(
 ) -> Result<Vec<CalendarEvent>, String> {
     validate_date(&date)?;
     let conn = db.conn().lock().map_err(|e| e.to_string())?;
-    let sql  = format!(
+    let sql = format!(
         "SELECT {} FROM calendar_events WHERE date = ?1 ORDER BY start_time ASC",
         SELECT_COLS
     );
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![date], row_to_event)
+    let rows = stmt
+        .query_map(params![date], row_to_event)
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string());
@@ -305,13 +318,14 @@ pub fn calendar_list_by_range(
         return Err(format!("from date '{}' must be <= to date '{}'", from, to));
     }
     let conn = db.conn().lock().map_err(|e| e.to_string())?;
-    let sql  = format!(
+    let sql = format!(
         "SELECT {} FROM calendar_events \
          WHERE date >= ?1 AND date <= ?2 ORDER BY date ASC, start_time ASC",
         SELECT_COLS
     );
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![from, to], row_to_event)
+    let rows = stmt
+        .query_map(params![from, to], row_to_event)
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string());
@@ -323,15 +337,29 @@ pub(crate) fn calendar_update_inner(
     db: &Database,
 ) -> Result<CalendarEvent, String> {
     // Validate every provided field before touching the DB.
-    if let Some(ref t) = payload.title       { validate_title(t)?; }
-    if let Some(ref et) = payload.event_type  { validate_event_type(et)?; }
-    if let Some(ref d) = payload.date        { validate_date(d)?; }
-    if let Some(ref t) = payload.start_time  { validate_time(t)?; }
-    if let Some(ref t) = payload.end_time    { validate_time(t)?; }
-    if let Some(d) = payload.duration_minutes { validate_duration(d)?; }
-    if let Some(r) = payload.reminder_minutes { validate_reminder(r)?; }
+    if let Some(ref t) = payload.title {
+        validate_title(t)?;
+    }
+    if let Some(ref et) = payload.event_type {
+        validate_event_type(et)?;
+    }
+    if let Some(ref d) = payload.date {
+        validate_date(d)?;
+    }
+    if let Some(ref t) = payload.start_time {
+        validate_time(t)?;
+    }
+    if let Some(ref t) = payload.end_time {
+        validate_time(t)?;
+    }
+    if let Some(d) = payload.duration_minutes {
+        validate_duration(d)?;
+    }
+    if let Some(r) = payload.reminder_minutes {
+        validate_reminder(r)?;
+    }
 
-    let mut set_parts: Vec<String>                = Vec::new();
+    let mut set_parts: Vec<String> = Vec::new();
     let mut values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
     if let Some(ref v) = payload.title {
@@ -381,7 +409,7 @@ pub(crate) fn calendar_update_inner(
     if set_parts.is_empty() {
         // Nothing to update — fetch and return current state.
         let conn = db.conn().lock().map_err(|e| e.to_string())?;
-        let sql  = format!("SELECT {} FROM calendar_events WHERE id = ?1", SELECT_COLS);
+        let sql = format!("SELECT {} FROM calendar_events WHERE id = ?1", SELECT_COLS);
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         return stmt
             .query_row(params![payload.id], row_to_event)
@@ -395,8 +423,7 @@ pub(crate) fn calendar_update_inner(
     values.push(Box::new(payload.id));
 
     let conn = db.conn().lock().map_err(|e| e.to_string())?;
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
-        values.iter().map(|v| v.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> = values.iter().map(|v| v.as_ref()).collect();
     let affected = conn
         .execute(&sql, params_refs.as_slice())
         .map_err(|e| e.to_string())?;
@@ -420,7 +447,7 @@ pub fn calendar_update(
 }
 
 pub(crate) fn calendar_delete_inner(id: i64, db: &Database) -> Result<(), String> {
-    let conn     = db.conn().lock().map_err(|e| e.to_string())?;
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
     let affected = conn
         .execute("DELETE FROM calendar_events WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
@@ -441,7 +468,7 @@ pub fn calendar_active_dates(
     month: String,
     db: State<Database>,
 ) -> Result<Vec<ActiveDate>, String> {
-    let conn    = db.conn().lock().map_err(|e| e.to_string())?;
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
     let pattern = format!("{}%", month);
     let mut stmt = conn
         .prepare(
@@ -450,12 +477,16 @@ pub fn calendar_active_dates(
         )
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(params![pattern], |row| {
-        Ok(ActiveDate { date: row.get(0)?, event_type: row.get(1)? })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string());
+    let rows = stmt
+        .query_map(params![pattern], |row| {
+            Ok(ActiveDate {
+                date: row.get(0)?,
+                event_type: row.get(1)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
     rows
 }
 
@@ -468,7 +499,7 @@ pub fn get_pending_notifications(
     local_today: &str,
 ) -> Result<Vec<CalendarEvent>, String> {
     let conn = db.conn().lock().map_err(|e| e.to_string())?;
-    let sql  = format!(
+    let sql = format!(
         "SELECT {} FROM calendar_events \
          WHERE reminder_minutes IS NOT NULL \
            AND (notified IS NULL OR notified = 0) \
@@ -478,7 +509,8 @@ pub fn get_pending_notifications(
         SELECT_COLS
     );
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![local_today], row_to_event)
+    let rows = stmt
+        .query_map(params![local_today], row_to_event)
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string());
@@ -544,7 +576,10 @@ mod tests {
         assert!(validate_date("2026-00-01").is_err(), "month 0 must fail");
         assert!(validate_date("2026-13-01").is_err(), "month 13 must fail");
         assert!(validate_date("2024-02-30").is_err(), "Feb 30 must fail");
-        assert!(validate_date("2023-02-29").is_err(), "Feb 29 non-leap must fail");
+        assert!(
+            validate_date("2023-02-29").is_err(),
+            "Feb 29 non-leap must fail"
+        );
     }
 
     #[test]
@@ -562,9 +597,12 @@ mod tests {
 
     #[test]
     fn time_format_invalid() {
-        assert!(validate_time("9:30").is_err(),  "single-digit hour must fail");
-        assert!(validate_time("9:3").is_err(),   "single-digit min must fail");
-        assert!(validate_time("noon").is_err(),  "text must fail");
+        assert!(
+            validate_time("9:30").is_err(),
+            "single-digit hour must fail"
+        );
+        assert!(validate_time("9:3").is_err(), "single-digit min must fail");
+        assert!(validate_time("noon").is_err(), "text must fail");
     }
 
     /// chrono must reject out-of-range time components even if the format is
@@ -648,7 +686,8 @@ mod tests {
                 "INSERT INTO calendar_events (title, type, date, start_time, notified)
                  VALUES ('NoReminder', 'event', '2024-06-15', '14:00', 0)",
                 [],
-            ).unwrap();
+            )
+            .unwrap();
         }
         let events = get_pending_notifications(&db, "2024-06-15").unwrap();
         assert!(events.is_empty(), "Event without reminder must not appear");
@@ -729,11 +768,13 @@ mod tests {
         calendar_delete_inner(evt.id, &db).unwrap();
 
         let conn = db.conn().lock().unwrap();
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM calendar_events WHERE id = ?1",
-            params![evt.id],
-            |r| r.get(0),
-        ).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM calendar_events WHERE id = ?1",
+                params![evt.id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 0, "Event must be gone after delete");
     }
 
@@ -807,10 +848,10 @@ mod tests {
         let evt = calendar_create_inner(make_event("2025-08-01"), &db).unwrap();
         let mut p = make_update(evt.id);
         p.title = Some("Updated title".to_string());
-        p.date  = Some("2025-09-15".to_string());
+        p.date = Some("2025-09-15".to_string());
         let result = calendar_update_inner(p, &db).unwrap();
         assert_eq!(result.title, "Updated title");
-        assert_eq!(result.date,  "2025-09-15");
+        assert_eq!(result.date, "2025-09-15");
         // Rescheduled — notified must be reset to 0
         assert_eq!(result.notified, Some(0));
     }
@@ -826,6 +867,10 @@ mod tests {
         let mut p = make_update(evt.id);
         p.reminder_minutes = Some(30);
         let result = calendar_update_inner(p, &db).unwrap();
-        assert_eq!(result.notified, Some(0), "notified must be reset after reminder change");
+        assert_eq!(
+            result.notified,
+            Some(0),
+            "notified must be reset after reminder change"
+        );
     }
 }

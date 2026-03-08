@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::State;
 use std::sync::Mutex;
+use tauri::State;
 
 const NOTE_EXT: &str = ".json";
 const FOLDER_META: &str = "_folder.json";
@@ -86,7 +86,9 @@ pub enum MaybeUpdate<T> {
 }
 
 impl<T> Default for MaybeUpdate<T> {
-    fn default() -> Self { MaybeUpdate::Absent }
+    fn default() -> Self {
+        MaybeUpdate::Absent
+    }
 }
 
 impl<'de, T> serde::Deserialize<'de> for MaybeUpdate<T>
@@ -187,12 +189,11 @@ pub fn safe_resolve(root: &Path, user_path: &str) -> Result<PathBuf, String> {
     //    If the path does not yet exist we walk up to the first existing
     //    ancestor and check that instead — this covers create operations
     //    where the leaf does not exist yet.
-    let canonical_root = fs::canonicalize(root)
-        .map_err(|e| format!("Cannot canonicalise notes root: {e}"))?;
+    let canonical_root =
+        fs::canonicalize(root).map_err(|e| format!("Cannot canonicalise notes root: {e}"))?;
 
     let canonical_candidate = if candidate.exists() {
-        fs::canonicalize(&candidate)
-            .map_err(|e| format!("Cannot canonicalise path: {e}"))?
+        fs::canonicalize(&candidate).map_err(|e| format!("Cannot canonicalise path: {e}"))?
     } else {
         // Walk up until we find an ancestor that exists.
         let mut check = candidate.as_path();
@@ -201,7 +202,8 @@ pub fn safe_resolve(root: &Path, user_path: &str) -> Result<PathBuf, String> {
                 let canon = fs::canonicalize(check)
                     .map_err(|e| format!("Cannot canonicalise ancestor: {e}"))?;
                 // Re-attach the non-existent suffix.
-                let suffix = candidate.strip_prefix(check)
+                let suffix = candidate
+                    .strip_prefix(check)
                     .map_err(|_| "Strip prefix failed".to_string())?;
                 break canon.join(suffix);
             }
@@ -213,9 +215,7 @@ pub fn safe_resolve(root: &Path, user_path: &str) -> Result<PathBuf, String> {
     };
 
     if !canonical_candidate.starts_with(&canonical_root) {
-        return Err(format!(
-            "Path escapes notes root: {user_path}"
-        ));
+        return Err(format!("Path escapes notes root: {user_path}"));
     }
 
     Ok(canonical_candidate)
@@ -327,10 +327,22 @@ fn scan_dir(dir: &Path, root: &Path) -> Vec<NoteEntry> {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string();
-            let title   = meta.as_ref().map(|m| m.title.clone()).unwrap_or_else(|| dir_name.clone());
-            let icon    = meta.as_ref().map(|m| m.icon.clone()).unwrap_or_else(|| "◈".to_string());
-            let created = meta.as_ref().map(|m| m.created_at.clone()).unwrap_or_else(now_iso);
-            let updated = meta.as_ref().map(|m| m.updated_at.clone()).unwrap_or_else(now_iso);
+            let title = meta
+                .as_ref()
+                .map(|m| m.title.clone())
+                .unwrap_or_else(|| dir_name.clone());
+            let icon = meta
+                .as_ref()
+                .map(|m| m.icon.clone())
+                .unwrap_or_else(|| "◈".to_string());
+            let created = meta
+                .as_ref()
+                .map(|m| m.created_at.clone())
+                .unwrap_or_else(now_iso);
+            let updated = meta
+                .as_ref()
+                .map(|m| m.updated_at.clone())
+                .unwrap_or_else(now_iso);
 
             entries.push(NoteEntry {
                 id: id.clone(),
@@ -357,7 +369,7 @@ fn scan_dir(dir: &Path, root: &Path) -> Vec<NoteEntry> {
 
             if file_name.ends_with(NOTE_EXT) && file_name != FOLDER_META {
                 if let Ok(data) = read_note_file(&full_path) {
-                    let id   = rel_id(&full_path, root);
+                    let id = rel_id(&full_path, root);
                     let name = if data.title.is_empty() {
                         file_name.trim_end_matches(NOTE_EXT).to_string()
                     } else {
@@ -368,7 +380,11 @@ fn scan_dir(dir: &Path, root: &Path) -> Vec<NoteEntry> {
                         id: id.clone(),
                         name: name.clone(),
                         title: name,
-                        icon: if data.icon.is_empty() { "◉".to_string() } else { data.icon },
+                        icon: if data.icon.is_empty() {
+                            "◉".to_string()
+                        } else {
+                            data.icon
+                        },
                         is_folder: false,
                         parent_id: parent_id(&id),
                         content: None,
@@ -413,20 +429,33 @@ pub fn notes_get(id: String, notes_root: State<NotesRoot>) -> Result<Option<Note
             None
         };
 
-        let dir_name = abs_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let dir_name = abs_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let title = meta.as_ref().map(|m| m.title.clone()).unwrap_or(dir_name);
 
         return Ok(Some(NoteEntry {
             id: id.clone(),
             name: title.clone(),
             title,
-            icon:       meta.as_ref().map(|m| m.icon.clone()).unwrap_or_else(|| "◈".to_string()),
-            is_folder:  true,
-            parent_id:  parent_id(&id),
-            content:    None,
-            created_at: meta.as_ref().map(|m| m.created_at.clone()).unwrap_or_else(now_iso),
-            updated_at: meta.as_ref().map(|m| m.updated_at.clone()).unwrap_or_else(now_iso),
-            tags:       meta.as_ref().map(|m| m.tags.clone()).unwrap_or_default(),
+            icon: meta
+                .as_ref()
+                .map(|m| m.icon.clone())
+                .unwrap_or_else(|| "◈".to_string()),
+            is_folder: true,
+            parent_id: parent_id(&id),
+            content: None,
+            created_at: meta
+                .as_ref()
+                .map(|m| m.created_at.clone())
+                .unwrap_or_else(now_iso),
+            updated_at: meta
+                .as_ref()
+                .map(|m| m.updated_at.clone())
+                .unwrap_or_else(now_iso),
+            tags: meta.as_ref().map(|m| m.tags.clone()).unwrap_or_default(),
             difficulty: meta.as_ref().and_then(|m| m.difficulty.clone()),
             sort_order: meta.as_ref().map(|m| m.sort_order).unwrap_or(0),
         }));
@@ -435,43 +464,50 @@ pub fn notes_get(id: String, notes_root: State<NotesRoot>) -> Result<Option<Note
     let data = read_note_file(&abs_path)?;
     Ok(Some(NoteEntry {
         id: id.clone(),
-        name:       data.title.clone(),
-        title:      data.title,
-        icon:       if data.icon.is_empty() { "◉".to_string() } else { data.icon },
-        is_folder:  false,
-        parent_id:  parent_id(&id),
-        content:    data.content,
+        name: data.title.clone(),
+        title: data.title,
+        icon: if data.icon.is_empty() {
+            "◉".to_string()
+        } else {
+            data.icon
+        },
+        is_folder: false,
+        parent_id: parent_id(&id),
+        content: data.content,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        tags:       data.tags,
+        tags: data.tags,
         difficulty: data.difficulty,
         sort_order: data.sort_order,
     }))
 }
 
 #[tauri::command]
-pub fn notes_create(payload: CreateNotePayload, notes_root: State<NotesRoot>) -> Result<NoteEntry, String> {
-    let root  = notes_root.path.lock().map_err(|e| e.to_string())?;
+pub fn notes_create(
+    payload: CreateNotePayload,
+    notes_root: State<NotesRoot>,
+) -> Result<NoteEntry, String> {
+    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
     let title = payload.title.unwrap_or_else(|| "Untitled".to_string());
 
     let parent_dir = match &payload.parent_id {
         Some(pid) => safe_resolve(&root, pid)?,
-        None      => root.clone(),
+        None => root.clone(),
     };
 
     fs::create_dir_all(&parent_dir).map_err(|e| e.to_string())?;
 
-    let slug      = slugify(&title);
+    let slug = slugify(&title);
     let file_path = make_unique_file_path(&parent_dir, &slug, NOTE_EXT);
-    let now       = now_iso();
+    let now = now_iso();
 
     let note_data = NoteFile {
-        title:      title.clone(),
-        icon:       payload.icon.unwrap_or_else(|| "◉".to_string()),
-        content:    Some(serde_json::json!({ "type": "doc", "content": [] })),
+        title: title.clone(),
+        icon: payload.icon.unwrap_or_else(|| "◉".to_string()),
+        content: Some(serde_json::json!({ "type": "doc", "content": [] })),
         created_at: now.clone(),
         updated_at: now.clone(),
-        tags:       payload.tags,
+        tags: payload.tags,
         difficulty: payload.difficulty,
         sort_order: payload.sort_order,
     };
@@ -481,44 +517,47 @@ pub fn notes_create(payload: CreateNotePayload, notes_root: State<NotesRoot>) ->
     let id = rel_id(&file_path, &root);
     Ok(NoteEntry {
         id: id.clone(),
-        name:       title.clone(),
+        name: title.clone(),
         title,
-        icon:       note_data.icon,
-        is_folder:  false,
-        parent_id:  parent_id(&id),
-        content:    note_data.content,
+        icon: note_data.icon,
+        is_folder: false,
+        parent_id: parent_id(&id),
+        content: note_data.content,
         created_at: now.clone(),
         updated_at: now.clone(),
-        tags:       note_data.tags,
+        tags: note_data.tags,
         difficulty: note_data.difficulty,
         sort_order: note_data.sort_order,
     })
 }
 
 #[tauri::command]
-pub fn notes_create_folder(payload: CreateNotePayload, notes_root: State<NotesRoot>) -> Result<NoteEntry, String> {
-    let root  = notes_root.path.lock().map_err(|e| e.to_string())?;
+pub fn notes_create_folder(
+    payload: CreateNotePayload,
+    notes_root: State<NotesRoot>,
+) -> Result<NoteEntry, String> {
+    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
     let title = payload.title.unwrap_or_else(|| "New Folder".to_string());
 
     let parent_dir = match &payload.parent_id {
         Some(pid) => safe_resolve(&root, pid)?,
-        None      => root.clone(),
+        None => root.clone(),
     };
 
     fs::create_dir_all(&parent_dir).map_err(|e| e.to_string())?;
 
-    let slug     = slugify(&title);
+    let slug = slugify(&title);
     let dir_path = make_unique_dir_path(&parent_dir, &slug);
     fs::create_dir_all(&dir_path).map_err(|e| e.to_string())?;
 
     let now = now_iso();
     let meta = NoteFile {
-        title:      title.clone(),
-        icon:       payload.icon.unwrap_or_else(|| "◈".to_string()),
-        content:    None,
+        title: title.clone(),
+        icon: payload.icon.unwrap_or_else(|| "◈".to_string()),
+        content: None,
         created_at: now.clone(),
         updated_at: now.clone(),
-        tags:       payload.tags,
+        tags: payload.tags,
         difficulty: payload.difficulty,
         sort_order: payload.sort_order,
     };
@@ -527,23 +566,26 @@ pub fn notes_create_folder(payload: CreateNotePayload, notes_root: State<NotesRo
     let id = rel_id(&dir_path, &root);
     Ok(NoteEntry {
         id: id.clone(),
-        name:      title.clone(),
+        name: title.clone(),
         title,
-        icon:      meta.icon,
+        icon: meta.icon,
         is_folder: true,
         parent_id: parent_id(&id),
-        content:   None,
+        content: None,
         created_at: now.clone(),
         updated_at: now.clone(),
-        tags:       meta.tags,
+        tags: meta.tags,
         difficulty: meta.difficulty,
         sort_order: meta.sort_order,
     })
 }
 
 #[tauri::command]
-pub fn notes_update(payload: UpdateNotePayload, notes_root: State<NotesRoot>) -> Result<Option<NoteEntry>, String> {
-    let root     = notes_root.path.lock().map_err(|e| e.to_string())?;
+pub fn notes_update(
+    payload: UpdateNotePayload,
+    notes_root: State<NotesRoot>,
+) -> Result<Option<NoteEntry>, String> {
+    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
     let abs_path = safe_resolve(&root, &payload.id)?;
 
     if !abs_path.exists() {
@@ -559,71 +601,99 @@ pub fn notes_update(payload: UpdateNotePayload, notes_root: State<NotesRoot>) ->
                 .ok()
                 .and_then(|raw| serde_json::from_str(&raw).ok())
                 .unwrap_or_else(|| NoteFile {
-                    title: "".to_string(), icon: "◈".to_string(),
-                    content: None, created_at: now.clone(), updated_at: now.clone(),
-                    tags: vec![], difficulty: None, sort_order: 0,
+                    title: "".to_string(),
+                    icon: "◈".to_string(),
+                    content: None,
+                    created_at: now.clone(),
+                    updated_at: now.clone(),
+                    tags: vec![],
+                    difficulty: None,
+                    sort_order: 0,
                 })
         } else {
             NoteFile {
-                title: "".to_string(), icon: "◈".to_string(),
-                content: None, created_at: now.clone(), updated_at: now.clone(),
-                tags: vec![], difficulty: None, sort_order: 0,
+                title: "".to_string(),
+                icon: "◈".to_string(),
+                content: None,
+                created_at: now.clone(),
+                updated_at: now.clone(),
+                tags: vec![],
+                difficulty: None,
+                sort_order: 0,
             }
         };
 
-        if let Some(t) = &payload.title      { meta.title      = t.clone(); }
-        if let Some(i) = &payload.icon       { meta.icon       = i.clone(); }
-        if let Some(t) = &payload.tags       { meta.tags       = t.clone(); }
-        match &payload.difficulty {
-            MaybeUpdate::Absent     => {}                          // keep existing
-            MaybeUpdate::Clear      => meta.difficulty = None,     // explicit clear
-            MaybeUpdate::Set(d)     => meta.difficulty = Some(d.clone()), // set value
+        if let Some(t) = &payload.title {
+            meta.title = t.clone();
         }
-        if let Some(o) = payload.sort_order  { meta.sort_order = o; }
+        if let Some(i) = &payload.icon {
+            meta.icon = i.clone();
+        }
+        if let Some(t) = &payload.tags {
+            meta.tags = t.clone();
+        }
+        match &payload.difficulty {
+            MaybeUpdate::Absent => {}                                 // keep existing
+            MaybeUpdate::Clear => meta.difficulty = None,             // explicit clear
+            MaybeUpdate::Set(d) => meta.difficulty = Some(d.clone()), // set value
+        }
+        if let Some(o) = payload.sort_order {
+            meta.sort_order = o;
+        }
         meta.updated_at = now.clone();
         write_note_file(&meta_path, &meta)?;
 
         return Ok(Some(NoteEntry {
-            id:        payload.id.clone(),
-            name:      meta.title.clone(),
-            title:     meta.title,
-            icon:      meta.icon,
+            id: payload.id.clone(),
+            name: meta.title.clone(),
+            title: meta.title,
+            icon: meta.icon,
             is_folder: true,
             parent_id: parent_id(&payload.id),
-            content:   None,
+            content: None,
             created_at: meta.created_at,
             updated_at: now,
-            tags:       meta.tags,
+            tags: meta.tags,
             difficulty: meta.difficulty,
             sort_order: meta.sort_order,
         }));
     }
 
     let mut data = read_note_file(&abs_path)?;
-    if let Some(t) = &payload.title      { data.title      = t.clone(); }
-    if let Some(c) = &payload.content    { data.content    = Some(c.clone()); }
-    if let Some(i) = &payload.icon       { data.icon       = i.clone(); }
-    if let Some(t) = &payload.tags       { data.tags       = t.clone(); }
-    match &payload.difficulty {
-        MaybeUpdate::Absent     => {}                              // keep existing
-        MaybeUpdate::Clear      => data.difficulty = None,        // explicit clear
-        MaybeUpdate::Set(d)     => data.difficulty = Some(d.clone()), // set value
+    if let Some(t) = &payload.title {
+        data.title = t.clone();
     }
-    if let Some(o) = payload.sort_order  { data.sort_order = o; }
+    if let Some(c) = &payload.content {
+        data.content = Some(c.clone());
+    }
+    if let Some(i) = &payload.icon {
+        data.icon = i.clone();
+    }
+    if let Some(t) = &payload.tags {
+        data.tags = t.clone();
+    }
+    match &payload.difficulty {
+        MaybeUpdate::Absent => {}                                 // keep existing
+        MaybeUpdate::Clear => data.difficulty = None,             // explicit clear
+        MaybeUpdate::Set(d) => data.difficulty = Some(d.clone()), // set value
+    }
+    if let Some(o) = payload.sort_order {
+        data.sort_order = o;
+    }
     data.updated_at = now.clone();
     write_note_file(&abs_path, &data)?;
 
     Ok(Some(NoteEntry {
-        id:        payload.id.clone(),
-        name:      data.title.clone(),
-        title:     data.title,
-        icon:      data.icon,
+        id: payload.id.clone(),
+        name: data.title.clone(),
+        title: data.title,
+        icon: data.icon,
         is_folder: false,
         parent_id: parent_id(&payload.id),
-        content:   data.content,
+        content: data.content,
         created_at: data.created_at,
         updated_at: now,
-        tags:       data.tags,
+        tags: data.tags,
         difficulty: data.difficulty,
         sort_order: data.sort_order,
     }))
@@ -631,7 +701,7 @@ pub fn notes_update(payload: UpdateNotePayload, notes_root: State<NotesRoot>) ->
 
 #[tauri::command]
 pub fn notes_delete(id: String, notes_root: State<NotesRoot>) -> Result<(), String> {
-    let root     = notes_root.path.lock().map_err(|e| e.to_string())?;
+    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
     let abs_path = safe_resolve(&root, &id)?;
 
     if !abs_path.exists() {
@@ -646,10 +716,44 @@ pub fn notes_delete(id: String, notes_root: State<NotesRoot>) -> Result<(), Stri
     Ok(())
 }
 
+/// Open the notes root directory in the system file manager.
+///
+/// Previously this returned the path as a string and the frontend used the
+/// Tauri shell plugin's `open()` helper.  That approach silently failed on
+/// Windows because the plugin's scope validation rejects local directory
+/// paths.  We now open the folder directly in Rust, which sidesteps the
+/// shell-plugin scope entirely and works reliably on all platforms.
 #[tauri::command]
 pub fn notes_open_folder(notes_root: State<NotesRoot>) -> Result<String, String> {
     let root = notes_root.path.lock().map_err(|e| e.to_string())?;
-    Ok(root.to_string_lossy().to_string())
+    let path_str = root.to_string_lossy().to_string();
+
+    // Ensure the directory exists (it might have been deleted externally)
+    if !root.exists() {
+        std::fs::create_dir_all(&*root)
+            .map_err(|e| format!("Failed to create notes directory: {e}"))?;
+        log::info!("[Notes] Recreated notes directory: {}", path_str);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Use explorer.exe with /e, flag to open in file explorer view
+        std::process::Command::new("explorer")
+            .arg(&*root)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder in Explorer: {e}"))?;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&*root)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
+    }
+
+    log::info!("[Notes] Opened notes folder: {}", path_str);
+    Ok(path_str)
 }
 
 #[tauri::command]
@@ -679,8 +783,11 @@ pub struct MoveNotePayload {
 }
 
 #[tauri::command]
-pub fn notes_move(payload: MoveNotePayload, notes_root: State<NotesRoot>) -> Result<NoteEntry, String> {
-    let root     = notes_root.path.lock().map_err(|e| e.to_string())?;
+pub fn notes_move(
+    payload: MoveNotePayload,
+    notes_root: State<NotesRoot>,
+) -> Result<NoteEntry, String> {
+    let root = notes_root.path.lock().map_err(|e| e.to_string())?;
     let src_path = safe_resolve(&root, &payload.id)?;
 
     if !src_path.exists() {
@@ -707,49 +814,73 @@ pub fn notes_move(payload: MoveNotePayload, notes_root: State<NotesRoot>) -> Res
     // Skip no-op (same parent)
     let current_parent = src_path.parent().ok_or("Source has no parent")?;
     if fs::canonicalize(&dst_dir).map_err(|e| e.to_string())?
-       == fs::canonicalize(current_parent).map_err(|e| e.to_string())? {
+        == fs::canonicalize(current_parent).map_err(|e| e.to_string())?
+    {
         // Already there — just return the current entry unchanged
         let id_str = payload.id.clone();
         if src_path.is_dir() {
             let meta_path = src_path.join(FOLDER_META);
             let meta: Option<NoteFile> = if meta_path.exists() {
-                fs::read_to_string(&meta_path).ok().and_then(|r| serde_json::from_str(&r).ok())
-            } else { None };
-            let title = meta.as_ref().map(|m| m.title.clone()).unwrap_or_else(|| id_str.clone());
+                fs::read_to_string(&meta_path)
+                    .ok()
+                    .and_then(|r| serde_json::from_str(&r).ok())
+            } else {
+                None
+            };
+            let title = meta
+                .as_ref()
+                .map(|m| m.title.clone())
+                .unwrap_or_else(|| id_str.clone());
             return Ok(NoteEntry {
-                id:         id_str.clone(),
-                name:       title.clone(),
+                id: id_str.clone(),
+                name: title.clone(),
                 title,
-                icon:       meta.as_ref().map(|m| m.icon.clone()).unwrap_or_else(|| "◈".to_string()),
-                is_folder:  true,
-                parent_id:  parent_id(&id_str),
-                content:    None,
-                created_at: meta.as_ref().map(|m| m.created_at.clone()).unwrap_or_else(now_iso),
-                updated_at: meta.as_ref().map(|m| m.updated_at.clone()).unwrap_or_else(now_iso),
-                tags:       meta.as_ref().map(|m| m.tags.clone()).unwrap_or_default(),
+                icon: meta
+                    .as_ref()
+                    .map(|m| m.icon.clone())
+                    .unwrap_or_else(|| "◈".to_string()),
+                is_folder: true,
+                parent_id: parent_id(&id_str),
+                content: None,
+                created_at: meta
+                    .as_ref()
+                    .map(|m| m.created_at.clone())
+                    .unwrap_or_else(now_iso),
+                updated_at: meta
+                    .as_ref()
+                    .map(|m| m.updated_at.clone())
+                    .unwrap_or_else(now_iso),
+                tags: meta.as_ref().map(|m| m.tags.clone()).unwrap_or_default(),
                 difficulty: meta.as_ref().and_then(|m| m.difficulty.clone()),
                 sort_order: meta.as_ref().map(|m| m.sort_order).unwrap_or(0),
             });
         }
         let data = read_note_file(&src_path)?;
         return Ok(NoteEntry {
-            id:         id_str.clone(),
-            name:       data.title.clone(),
-            title:      data.title,
-            icon:       if data.icon.is_empty() { "◉".to_string() } else { data.icon },
-            is_folder:  false,
-            parent_id:  parent_id(&id_str),
-            content:    data.content,
+            id: id_str.clone(),
+            name: data.title.clone(),
+            title: data.title,
+            icon: if data.icon.is_empty() {
+                "◉".to_string()
+            } else {
+                data.icon
+            },
+            is_folder: false,
+            parent_id: parent_id(&id_str),
+            content: data.content,
             created_at: data.created_at,
             updated_at: data.updated_at,
-            tags:       data.tags,
+            tags: data.tags,
             difficulty: data.difficulty,
             sort_order: data.sort_order,
         });
     }
 
     // Build destination path, avoiding collisions
-    let leaf = src_path.file_name().ok_or("Source has no file name")?.to_os_string();
+    let leaf = src_path
+        .file_name()
+        .ok_or("Source has no file name")?
+        .to_os_string();
     let dst_path = {
         let candidate = dst_dir.join(&leaf);
         if !candidate.exists() {
@@ -758,7 +889,10 @@ pub fn notes_move(payload: MoveNotePayload, notes_root: State<NotesRoot>) -> Res
             let base = leaf.to_string_lossy();
             make_unique_dir_path(&dst_dir, &base)
         } else {
-            let base = Path::new(&leaf).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+            let base = Path::new(&leaf)
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
             make_unique_file_path(&dst_dir, &base, NOTE_EXT)
         }
     };
@@ -767,8 +901,7 @@ pub fn notes_move(payload: MoveNotePayload, notes_root: State<NotesRoot>) -> Res
     // if src/dst are on different mount points; use copy+delete fallback).
     if let Err(_) = fs::rename(&src_path, &dst_path) {
         // Fallback: recursive copy then remove
-        copy_recursive(&src_path, &dst_path)
-            .map_err(|e| format!("Move (copy) failed: {e}"))?;
+        copy_recursive(&src_path, &dst_path).map_err(|e| format!("Move (copy) failed: {e}"))?;
         if src_path.is_dir() {
             fs::remove_dir_all(&src_path).map_err(|e| e.to_string())?;
         } else {
@@ -778,27 +911,41 @@ pub fn notes_move(payload: MoveNotePayload, notes_root: State<NotesRoot>) -> Res
 
     // Build updated NoteEntry for the new location
     let new_id = rel_id(&dst_path, &root);
-    let now    = now_iso();
+    let now = now_iso();
 
     if dst_path.is_dir() {
         let meta_path = dst_path.join(FOLDER_META);
         let meta: Option<NoteFile> = if meta_path.exists() {
-            fs::read_to_string(&meta_path).ok().and_then(|r| serde_json::from_str(&r).ok())
-        } else { None };
+            fs::read_to_string(&meta_path)
+                .ok()
+                .and_then(|r| serde_json::from_str(&r).ok())
+        } else {
+            None
+        };
         let title = meta.as_ref().map(|m| m.title.clone()).unwrap_or_else(|| {
-            dst_path.file_name().unwrap_or_default().to_string_lossy().to_string()
+            dst_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
         });
         return Ok(NoteEntry {
-            id:         new_id.clone(),
-            name:       title.clone(),
+            id: new_id.clone(),
+            name: title.clone(),
             title,
-            icon:       meta.as_ref().map(|m| m.icon.clone()).unwrap_or_else(|| "◈".to_string()),
-            is_folder:  true,
-            parent_id:  parent_id(&new_id),
-            content:    None,
-            created_at: meta.as_ref().map(|m| m.created_at.clone()).unwrap_or_else(|| now.clone()),
+            icon: meta
+                .as_ref()
+                .map(|m| m.icon.clone())
+                .unwrap_or_else(|| "◈".to_string()),
+            is_folder: true,
+            parent_id: parent_id(&new_id),
+            content: None,
+            created_at: meta
+                .as_ref()
+                .map(|m| m.created_at.clone())
+                .unwrap_or_else(|| now.clone()),
             updated_at: now,
-            tags:       meta.as_ref().map(|m| m.tags.clone()).unwrap_or_default(),
+            tags: meta.as_ref().map(|m| m.tags.clone()).unwrap_or_default(),
             difficulty: meta.as_ref().and_then(|m| m.difficulty.clone()),
             sort_order: meta.as_ref().map(|m| m.sort_order).unwrap_or(0),
         });
@@ -806,16 +953,20 @@ pub fn notes_move(payload: MoveNotePayload, notes_root: State<NotesRoot>) -> Res
 
     let data = read_note_file(&dst_path)?;
     Ok(NoteEntry {
-        id:         new_id.clone(),
-        name:       data.title.clone(),
-        title:      data.title,
-        icon:       if data.icon.is_empty() { "◉".to_string() } else { data.icon },
-        is_folder:  false,
-        parent_id:  parent_id(&new_id),
-        content:    data.content,
+        id: new_id.clone(),
+        name: data.title.clone(),
+        title: data.title,
+        icon: if data.icon.is_empty() {
+            "◉".to_string()
+        } else {
+            data.icon
+        },
+        is_folder: false,
+        parent_id: parent_id(&new_id),
+        content: data.content,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        tags:       data.tags,
+        tags: data.tags,
         difficulty: data.difficulty,
         sort_order: data.sort_order,
     })
@@ -830,7 +981,9 @@ fn copy_recursive(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
             copy_recursive(&entry.path(), &dst.join(entry.file_name()))?;
         }
     } else {
-        if let Some(p) = dst.parent() { fs::create_dir_all(p)?; }
+        if let Some(p) = dst.parent() {
+            fs::create_dir_all(p)?;
+        }
         fs::copy(src, dst)?;
     }
     Ok(())
@@ -844,7 +997,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, PathBuf) {
-        let dir  = TempDir::new().unwrap();
+        let dir = TempDir::new().unwrap();
         let root = dir.path().join("notes");
         fs::create_dir_all(&root).unwrap();
         (dir, root)
@@ -854,12 +1007,12 @@ mod tests {
     fn create_note_file(root: &Path, filename: &str, title: &str) -> PathBuf {
         let path = root.join(filename);
         let note = NoteFile {
-            title:      title.to_string(),
-            icon:       "◉".to_string(),
-            content:    None,
+            title: title.to_string(),
+            icon: "◉".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
-            tags:       vec![],
+            tags: vec![],
             difficulty: None,
             sort_order: 0,
         };
@@ -872,12 +1025,12 @@ mod tests {
         let dir_path = root.join(dir_name);
         fs::create_dir_all(&dir_path).unwrap();
         let meta = NoteFile {
-            title:      title.to_string(),
-            icon:       "◈".to_string(),
-            content:    None,
+            title: title.to_string(),
+            icon: "◈".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
-            tags:       vec![],
+            tags: vec![],
             difficulty: None,
             sort_order: 0,
         };
@@ -901,13 +1054,20 @@ mod tests {
     fn resolve_rejects_dotdot() {
         let (_dir, root) = setup();
         let err = safe_resolve(&root, "../escape").unwrap_err();
-        assert!(err.contains("traversal"), "expected traversal error, got: {err}");
+        assert!(
+            err.contains("traversal"),
+            "expected traversal error, got: {err}"
+        );
     }
 
     #[test]
     fn resolve_rejects_absolute_path() {
         let (_dir, root) = setup();
-        let abs = if cfg!(windows) { r"C:\Windows\system32" } else { "/etc/passwd" };
+        let abs = if cfg!(windows) {
+            r"C:\Windows\system32"
+        } else {
+            "/etc/passwd"
+        };
         let err = safe_resolve(&root, abs).unwrap_err();
         assert!(
             err.contains("relative") || err.contains("Absolute"),
@@ -919,7 +1079,10 @@ mod tests {
     fn resolve_rejects_encoded_traversal() {
         let (_dir, root) = setup();
         let err = safe_resolve(&root, "sub/../../etc").unwrap_err();
-        assert!(err.contains("traversal"), "expected traversal error, got: {err}");
+        assert!(
+            err.contains("traversal"),
+            "expected traversal error, got: {err}"
+        );
     }
 
     #[test]
@@ -939,21 +1102,21 @@ mod tests {
         let (_dir, root) = setup();
         let path = root.join("test.json");
         let original = NoteFile {
-            title:      "My Note".to_string(),
-            icon:       "◉".to_string(),
-            content:    Some(serde_json::json!({ "type": "doc" })),
+            title: "My Note".to_string(),
+            icon: "◉".to_string(),
+            content: Some(serde_json::json!({ "type": "doc" })),
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-02T00:00:00Z".to_string(),
-            tags:       vec!["rust".to_string(), "test".to_string()],
+            tags: vec!["rust".to_string(), "test".to_string()],
             difficulty: Some("hard".to_string()),
             sort_order: 42,
         };
         write_note_file(&path, &original).unwrap();
         let read_back = read_note_file(&path).unwrap();
-        assert_eq!(read_back.title,       "My Note");
-        assert_eq!(read_back.tags,        vec!["rust", "test"]);
-        assert_eq!(read_back.difficulty,  Some("hard".to_string()));
-        assert_eq!(read_back.sort_order,  42);
+        assert_eq!(read_back.title, "My Note");
+        assert_eq!(read_back.tags, vec!["rust", "test"]);
+        assert_eq!(read_back.difficulty, Some("hard".to_string()));
+        assert_eq!(read_back.sort_order, 42);
     }
 
     // ── scan_dir ─────────────────────────────────────────────────────────────
@@ -966,7 +1129,11 @@ mod tests {
         create_note_file(&root.join("folder-b"), "page-c.json", "Page C");
 
         let entries = scan_dir(&root, &root);
-        assert_eq!(entries.len(), 3, "should find 3 entries: page-a, folder-b, page-c");
+        assert_eq!(
+            entries.len(),
+            3,
+            "should find 3 entries: page-a, folder-b, page-c"
+        );
         let ids: Vec<&str> = entries.iter().map(|e| e.id.as_str()).collect();
         assert!(ids.iter().any(|id| id.ends_with("page-a.json")));
         assert!(ids.iter().any(|id| id.ends_with("folder-b")));
@@ -981,8 +1148,14 @@ mod tests {
         create_note_file(&inner, "inner-note.json", "Inner Note");
 
         let entries = scan_dir(&root, &root);
-        let inner_note = entries.iter().find(|e| e.id.ends_with("inner-note.json")).unwrap();
-        let folder = entries.iter().find(|e| e.is_folder && e.id.ends_with("outer")).unwrap();
+        let inner_note = entries
+            .iter()
+            .find(|e| e.id.ends_with("inner-note.json"))
+            .unwrap();
+        let folder = entries
+            .iter()
+            .find(|e| e.is_folder && e.id.ends_with("outer"))
+            .unwrap();
         assert_eq!(inner_note.parent_id.as_deref(), Some(folder.id.as_str()));
     }
 
@@ -993,16 +1166,22 @@ mod tests {
         let (_dir, root) = setup();
         let path = root.join("tagged.json");
         let note = NoteFile {
-            title: "Tagged".to_string(), icon: "◉".to_string(), content: None,
+            title: "Tagged".to_string(),
+            icon: "◉".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
             tags: vec!["alpha".to_string(), "beta".to_string()],
-            difficulty: None, sort_order: 0,
+            difficulty: None,
+            sort_order: 0,
         };
         write_note_file(&path, &note).unwrap();
 
         let entries = scan_dir(&root, &root);
-        let found = entries.iter().find(|e| e.id.ends_with("tagged.json")).unwrap();
+        let found = entries
+            .iter()
+            .find(|e| e.id.ends_with("tagged.json"))
+            .unwrap();
         assert_eq!(found.tags, vec!["alpha", "beta"]);
     }
 
@@ -1028,10 +1207,14 @@ mod tests {
         let (_dir, root) = setup();
         let path = root.join("clearable.json");
         let note = NoteFile {
-            title: "Note".to_string(), icon: "◉".to_string(), content: None,
+            title: "Note".to_string(),
+            icon: "◉".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
-            tags: vec![], difficulty: Some("hard".to_string()), sort_order: 0,
+            tags: vec![],
+            difficulty: Some("hard".to_string()),
+            sort_order: 0,
         };
         write_note_file(&path, &note).unwrap();
 
@@ -1049,21 +1232,29 @@ mod tests {
         let (_dir, root) = setup();
         let path = root.join("keep.json");
         let note = NoteFile {
-            title: "Note".to_string(), icon: "◉".to_string(), content: None,
+            title: "Note".to_string(),
+            icon: "◉".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
-            tags: vec![], difficulty: Some("easy".to_string()), sort_order: 0,
+            tags: vec![],
+            difficulty: Some("easy".to_string()),
+            sort_order: 0,
         };
         write_note_file(&path, &note).unwrap();
 
         // Simulate MaybeUpdate::Absent — do nothing to difficulty
         let mut data = read_note_file(&path).unwrap();
         data.title = "Renamed".to_string(); // only title change
-        // difficulty left untouched
+                                            // difficulty left untouched
         write_note_file(&path, &data).unwrap();
 
         let read_back = read_note_file(&path).unwrap();
-        assert_eq!(read_back.difficulty, Some("easy".to_string()), "difficulty should be preserved");
+        assert_eq!(
+            read_back.difficulty,
+            Some("easy".to_string()),
+            "difficulty should be preserved"
+        );
         assert_eq!(read_back.title, "Renamed");
     }
 
@@ -1103,15 +1294,22 @@ mod tests {
         let (_dir, root) = setup();
         let path = root.join("sorted.json");
         let note = NoteFile {
-            title: "Sorted".to_string(), icon: "◉".to_string(), content: None,
+            title: "Sorted".to_string(),
+            icon: "◉".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
-            tags: vec![], difficulty: None, sort_order: 7,
+            tags: vec![],
+            difficulty: None,
+            sort_order: 7,
         };
         write_note_file(&path, &note).unwrap();
 
         let entries = scan_dir(&root, &root);
-        let found = entries.iter().find(|e| e.id.ends_with("sorted.json")).unwrap();
+        let found = entries
+            .iter()
+            .find(|e| e.id.ends_with("sorted.json"))
+            .unwrap();
         assert_eq!(found.sort_order, 7);
     }
 
@@ -1136,7 +1334,9 @@ mod tests {
         let dir_path = root.join("project-folder");
         fs::create_dir_all(&dir_path).unwrap();
         let meta = NoteFile {
-            title: "Project".to_string(), icon: "◈".to_string(), content: None,
+            title: "Project".to_string(),
+            icon: "◈".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
             tags: vec!["school".to_string()],
@@ -1146,8 +1346,11 @@ mod tests {
         write_note_file(&dir_path.join(FOLDER_META), &meta).unwrap();
 
         let entries = scan_dir(&root, &root);
-        let folder = entries.iter().find(|e| e.is_folder && e.id.ends_with("project-folder")).unwrap();
-        assert_eq!(folder.tags,       vec!["school"]);
+        let folder = entries
+            .iter()
+            .find(|e| e.is_folder && e.id.ends_with("project-folder"))
+            .unwrap();
+        assert_eq!(folder.tags, vec!["school"]);
         assert_eq!(folder.difficulty, Some("medium".to_string()));
         assert_eq!(folder.sort_order, 3);
     }
@@ -1161,10 +1364,14 @@ mod tests {
 
         // Write initial with difficulty set
         let meta = NoteFile {
-            title: "CLR".to_string(), icon: "◈".to_string(), content: None,
+            title: "CLR".to_string(),
+            icon: "◈".to_string(),
+            content: None,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
-            tags: vec![], difficulty: Some("easy".to_string()), sort_order: 0,
+            tags: vec![],
+            difficulty: Some("easy".to_string()),
+            sort_order: 0,
         };
         write_note_file(&meta_path, &meta).unwrap();
 
@@ -1174,7 +1381,10 @@ mod tests {
         write_note_file(&meta_path, &reloaded).unwrap();
 
         let read_back = read_note_file(&meta_path).unwrap();
-        assert_eq!(read_back.difficulty, None, "folder difficulty should be cleared");
+        assert_eq!(
+            read_back.difficulty, None,
+            "folder difficulty should be cleared"
+        );
     }
 
     // ── notes_move ───────────────────────────────────────────────────────────
@@ -1187,14 +1397,14 @@ mod tests {
         fs::create_dir_all(&dest_dir).unwrap();
 
         // Perform the move manually (simulating notes_move logic)
-        let src  = root.join("moveme.json");
-        let dst  = dest_dir.join("moveme.json");
+        let src = root.join("moveme.json");
+        let dst = dest_dir.join("moveme.json");
         fs::rename(&src, &dst).unwrap();
 
         let new_id = rel_id(&dst, &root);
         assert!(new_id.contains("dest"), "new id should include dest folder");
         assert!(!src.exists(), "original file should be gone");
-        assert!(dst.exists(),  "file should exist in new location");
+        assert!(dst.exists(), "file should exist in new location");
     }
 
     #[test]
@@ -1215,7 +1425,8 @@ mod tests {
         let (_dir, root) = setup();
         let path = root.join("alpha.json");
         let note = NoteFile {
-            title: "Alpha".to_string(), icon: "◉".to_string(),
+            title: "Alpha".to_string(),
+            icon: "◉".to_string(),
             content: Some(serde_json::json!({ "type": "doc", "content": [] })),
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
@@ -1226,10 +1437,10 @@ mod tests {
         write_note_file(&path, &note).unwrap();
 
         let read_back = read_note_file(&path).unwrap();
-        assert_eq!(read_back.title,       "Alpha");
-        assert_eq!(read_back.tags,        vec!["tag1"]);
-        assert_eq!(read_back.difficulty,  Some("easy".to_string()));
-        assert_eq!(read_back.sort_order,  1);
+        assert_eq!(read_back.title, "Alpha");
+        assert_eq!(read_back.tags, vec!["tag1"]);
+        assert_eq!(read_back.difficulty, Some("easy".to_string()));
+        assert_eq!(read_back.sort_order, 1);
         assert!(read_back.content.is_some());
     }
 

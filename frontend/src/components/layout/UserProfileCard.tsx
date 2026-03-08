@@ -35,7 +35,7 @@ function resizeImage(file: File, maxSize = 256): Promise<string> {
   })
 }
 
-export default function UserProfileCard() {
+export default function UserProfileCard({ collapsed = false }: { collapsed?: boolean }) {
   const { name, avatar, status, setName, setAvatar, setStatus, hydrate } =
     useUserStore()
 
@@ -96,17 +96,21 @@ export default function UserProfileCard() {
 
       {/* ── Card ── */}
       <div
-        className="px-4 py-4 mx-3 mb-4 rounded-xl flex items-center gap-3"
+        className={collapsed ? "" : "px-4 py-4 mx-3 mb-4 rounded-xl flex items-center gap-3"}
         style={{
-          background: "var(--glass-bg)",
-          border: "1px solid var(--glass-border)",
-          marginTop: "auto",
+          background: collapsed ? "transparent" : "var(--glass-bg)",
+          border: collapsed ? "none" : "1px solid var(--glass-border)",
+          flexShrink: 0,
           transition:
             "background 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
           cursor: "pointer",
           position: "relative",
+          ...(collapsed ? {
+            display: "flex", justifyContent: "center",
+            padding: "8px 0 12px",
+          } : {}),
         }}
-        onClick={() => setShowProfilePopup((v) => !v)}
+        onClick={() => !collapsed && setShowProfilePopup((v) => !v)}
         onMouseEnter={(e) => {
           const el = e.currentTarget
           el.style.background = "var(--glass-bg-hover)"
@@ -184,42 +188,46 @@ export default function UserProfileCard() {
         </div>
 
         {/* Name + Status text */}
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div
-            className="font-semibold truncate"
-            style={{ fontSize: "12px", color: "var(--text-primary)" }}
-          >
-            {name}
+        {!collapsed && (
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div
+              className="font-semibold truncate"
+              style={{ fontSize: "12px", color: "var(--text-primary)" }}
+            >
+              {name}
+            </div>
+            <div
+              className="flex items-center gap-1"
+              style={{ fontSize: "10px", color: cfg.color }}
+            >
+              {cfg.label}
+            </div>
           </div>
-          <div
-            className="flex items-center gap-1"
-            style={{ fontSize: "10px", color: cfg.color }}
-          >
-            {cfg.label}
-          </div>
-        </div>
+        )}
 
         {/* Chevron */}
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="none"
-          style={{
-            color: "var(--text-tertiary)",
-            flexShrink: 0,
-            transform: showProfilePopup ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.2s ease",
-          }}
-        >
-          <path
-            d="M3 4.5L6 7.5L9 4.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        {!collapsed && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            style={{
+              color: "var(--text-tertiary)",
+              flexShrink: 0,
+              transform: showProfilePopup ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s ease",
+            }}
+          >
+            <path
+              d="M3 4.5L6 7.5L9 4.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
       </div>
 
       {/* ── Profile popup ── */}

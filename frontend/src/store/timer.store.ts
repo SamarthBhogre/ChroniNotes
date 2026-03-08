@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { playTimerComplete, playBreakStart } from "../lib/sounds"
 
 type Mode = "work" | "break" | "stopwatch" | "timer"
 
@@ -92,8 +93,12 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set({ workMinutes: w, breakMinutes: b })
   },
 
-  updateFromMain: (data) =>
-    set({ seconds: data.seconds, mode: data.mode }),
+  updateFromMain: (data) => {
+    const prev = useTimerStore.getState()
+    if (prev.mode === "work" && data.mode === "break") playBreakStart()
+    if (prev.mode === "break" && data.mode === "work") playTimerComplete()
+    set({ seconds: data.seconds, mode: data.mode })
+  },
 }))
 
 /* ═══════════════════════════════════
@@ -119,6 +124,7 @@ function startClientTimer() {
     if (newSeconds === 0) {
       stopClientTimer()
       useTimerStore.setState({ isRunning: false, isPaused: false })
+      playTimerComplete()
       
       // Send notification via Tauri bridge
       try {

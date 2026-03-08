@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { useCalendarStore } from "../store/calendar.store"
 import type { CalendarEvent, EventType } from "../store/calendar.store"
 import { useTasksStore } from "../store/tasks.store"
+import { useHabitsStore } from "../store/habits.store"
 
 /* ── Colour map for event types ── */
 const TYPE_COLORS: Record<EventType | string, { bg: string; border: string; text: string; dot: string }> = {
@@ -9,6 +10,8 @@ const TYPE_COLORS: Record<EventType | string, { bg: string; border: string; text
   reminder: { bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.3)",  text: "#fbbf24", dot: "#f59e0b" },
   focus:    { bg: "rgba(52,211,153,0.12)",  border: "rgba(52,211,153,0.3)",  text: "#34d399", dot: "#10b981" },
   task:     { bg: "rgba(167,139,250,0.12)", border: "rgba(167,139,250,0.3)", text: "#a78bfa", dot: "#8b5cf6" },
+  habit:    { bg: "rgba(52,211,153,0.08)",  border: "rgba(52,211,153,0.2)",  text: "#34d399", dot: "#10b981" },
+  countdown:{ bg: "rgba(244,114,182,0.12)", border: "rgba(244,114,182,0.3)", text: "#f472b6", dot: "#ec4899" },
 }
 
 const TYPE_ICONS: Record<string, string> = {
@@ -56,6 +59,16 @@ function reminderLabel(mins: number | null | undefined): string {
 }
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+
+/* ── Countdown items from localStorage ── */
+type CountdownItem = { id: string; label: string; date: string; color: string; icon: string; notes?: string }
+const COUNTDOWN_STORAGE_KEY = "chorniNotes-countdowns-v2"
+function loadCountdowns(): CountdownItem[] {
+  try { return JSON.parse(localStorage.getItem(COUNTDOWN_STORAGE_KEY) || "[]") } catch { return [] }
+}
+
+/* ── Habit summary for a single day ── */
+type DayHabitSummary = { completed: number; total: number; habits: { name: string; icon: string; color: string; done: boolean }[] }
 
 /* ══════════════════════════════════════
    EVENT CREATION / EDIT MODAL
@@ -298,9 +311,11 @@ function EventModal({
 /* ══════════════════════════════════════
    MONTH VIEW
 ══════════════════════════════════════ */
-function MonthView({ year, month, events, selectedDate, tasksWithDates, onSelectDate, onEventClick, onCreateEvent }: {
+function MonthView({ year, month, events, selectedDate, tasksWithDates, habitSummary, countdowns, onSelectDate, onEventClick, onCreateEvent }: {
   year: number; month: number; events: CalendarEvent[]
   selectedDate: string; tasksWithDates: any[]
+  habitSummary: Record<string, DayHabitSummary>
+  countdowns: CountdownItem[]
   onSelectDate: (d: string) => void; onEventClick: (e: CalendarEvent) => void
   onCreateEvent: (date: string) => void
 }) {
@@ -319,6 +334,12 @@ function MonthView({ year, month, events, selectedDate, tasksWithDates, onSelect
     if (!t.due_date) return acc
     if (!acc[t.due_date]) acc[t.due_date] = []
     acc[t.due_date].push(t)
+    return acc
+  }, {})
+
+  const countdownsByDate = countdowns.reduce<Record<string, CountdownItem[]>>((acc, c) => {
+    if (!acc[c.date]) acc[c.date] = []
+    acc[c.date].push(c)
     return acc
   }, {})
 
@@ -341,6 +362,8 @@ function MonthView({ year, month, events, selectedDate, tasksWithDates, onSelect
           const isSel    = dateStr === selectedDate
           const dayEvts  = isValid ? (eventsByDate[dateStr] ?? []) : []
           const dayTasks = isValid ? (tasksByDate[dateStr] ?? []) : []
+          const dayHabits = isValid ? (habitSummary[dateStr] ?? null) : null
+          const dayCountdowns = isValid ? (countdownsByDate[dateStr] ?? []) : []
           const hasReminder = dayEvts.some(e => e.reminder_minutes != null && e.reminder_minutes >= 0)
 
           return (
@@ -389,6 +412,30 @@ function MonthView({ year, month, events, selectedDate, tasksWithDates, onSelect
                       ))}
                     </div>
                   )}
+
+                  {/* Habit completion indicator */}
+                  {dayHabits && dayHabits.total > 0 && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: "3px", marginTop: "1px",
+                      padding: "1px 4px", borderRadius: "4px",
+                      background: dayHabits.completed === dayHabits.total ? "rgba(52,211,153,0.12)" : "rgba(52,211,153,0.06)",
+                    }}>
+                      <span style={{ fontSize: "8px" }}>⟡</span>
+                      <span style={{
+                        fontSize: "8px", fontWeight: 700,
+                        color: dayHabits.completed === dayHabits.total ? "#34d399" : "var(--text-tertiary)",
+                      }}>{dayHabits.completed}/{dayHabits.total}</span>
+                    </div>
+                  )}
+
+                  {/* Countdown markers */}
+                  {dayCountdowns.map(c => (
+                    <div key={c.id} style={{
+                      padding: "1px 5px", borderRadius: "4px", fontSize: "9px", fontWeight: 600,
+                      background: `${c.color}15`, borderLeft: `2px solid ${c.color}`,
+                      color: c.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>{c.icon} {c.label}</div>
+                  ))}
 
                   {dayEvts.length > 2 && (
                     <div style={{ fontSize: "9px", color: "var(--text-tertiary)", fontWeight: 600, paddingLeft: "2px" }}>+{dayEvts.length - 2} more</div>
@@ -467,11 +514,15 @@ function WeekView({ anchorDate, events, onSelectDate, onEventClick }: {
 /* ══════════════════════════════════════
    DAY VIEW
 ══════════════════════════════════════ */
-function DayView({ date, events, tasksWithDates, onEventClick }: {
-  date: string; events: CalendarEvent[]; tasksWithDates: any[]; onEventClick: (e: CalendarEvent) => void
+function DayView({ date, events, tasksWithDates, habitSummary, countdowns, onEventClick }: {
+  date: string; events: CalendarEvent[]; tasksWithDates: any[]
+  habitSummary: Record<string, DayHabitSummary>; countdowns: CountdownItem[]
+  onEventClick: (e: CalendarEvent) => void
 }) {
   const dayEvts  = events.filter(e => e.date === date).sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""))
   const dayTasks = tasksWithDates.filter(t => t.due_date === date)
+  const dayHabits = habitSummary[date] ?? null
+  const dayCountdowns = countdowns.filter(c => c.date === date)
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
@@ -512,6 +563,52 @@ function DayView({ date, events, tasksWithDates, onEventClick }: {
               <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase" }}>{t.status}</span>
             </div>
           ))}
+
+          {/* Habit summary for this day */}
+          {dayHabits && dayHabits.total > 0 && (
+            <div style={{
+              padding: "14px 18px", borderRadius: "12px",
+              background: TYPE_COLORS.habit.bg, borderLeft: `3px solid ${TYPE_COLORS.habit.dot}`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <span style={{ fontSize: "14px" }}>⟡</span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: TYPE_COLORS.habit.text, flex: 1 }}>
+                  Habits — {dayHabits.completed}/{dayHabits.total} completed
+                </span>
+                {dayHabits.completed === dayHabits.total && (
+                  <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "6px", background: "rgba(52,211,153,0.15)", color: "#34d399", fontWeight: 600 }}>
+                    ✓ All done
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                {dayHabits.habits.map((h, i) => (
+                  <span key={i} style={{
+                    padding: "3px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
+                    background: h.done ? `${h.color}20` : "var(--glass-bg)",
+                    border: `1px solid ${h.done ? `${h.color}40` : "var(--glass-border)"}`,
+                    color: h.done ? h.color : "var(--text-tertiary)",
+                  }}>{h.icon} {h.name}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Countdown events */}
+          {dayCountdowns.map(c => (
+            <div key={`cd-${c.id}`} style={{
+              padding: "12px 16px", borderRadius: "12px",
+              background: `${c.color}10`, borderLeft: `3px solid ${c.color}`,
+              display: "flex", alignItems: "center", gap: "10px",
+            }}>
+              <span style={{ fontSize: "18px" }}>{c.icon}</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: c.color }}>{c.label}</span>
+                {c.notes && <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>{c.notes}</div>}
+              </div>
+              <span style={{ fontSize: "9px", fontWeight: 600, color: c.color, textTransform: "uppercase" }}>Countdown</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -521,14 +618,18 @@ function DayView({ date, events, tasksWithDates, onEventClick }: {
 /* ══════════════════════════════════════
    AGENDA VIEW
 ══════════════════════════════════════ */
-function AgendaView({ events, tasksWithDates, onEventClick }: {
-  events: CalendarEvent[]; tasksWithDates: any[]; onEventClick: (e: CalendarEvent) => void
+function AgendaView({ events, tasksWithDates, habitSummary, countdowns, onEventClick }: {
+  events: CalendarEvent[]; tasksWithDates: any[]
+  habitSummary: Record<string, DayHabitSummary>; countdowns: CountdownItem[]
+  onEventClick: (e: CalendarEvent) => void
 }) {
   const today = toDateStr(new Date())
 
   const allDates = new Set([
     ...events.map(e => e.date),
     ...tasksWithDates.filter(t => t.due_date).map(t => t.due_date),
+    ...countdowns.map(c => c.date),
+    ...Object.keys(habitSummary).filter(d => (habitSummary[d]?.total ?? 0) > 0),
   ])
   const sortedDates = Array.from(allDates).filter(d => d >= today).sort()
 
@@ -547,6 +648,8 @@ function AgendaView({ events, tasksWithDates, onEventClick }: {
         const d       = new Date(date + "T12:00:00")
         const dayEvts = events.filter(e => e.date === date)
         const dayTasks = tasksWithDates.filter(t => t.due_date === date)
+        const dayHabits = habitSummary[date] ?? null
+        const dayCountdowns = countdowns.filter(c => c.date === date)
         const isToday = date === today
 
         return (
@@ -580,6 +683,37 @@ function AgendaView({ events, tasksWithDates, onEventClick }: {
                   <span style={{ fontSize: "12px", color: TYPE_COLORS.task.text, fontWeight: 600 }}>{t.title}</span>
                 </div>
               ))}
+
+              {/* Habit summary */}
+              {dayHabits && dayHabits.total > 0 && (
+                <div style={{
+                  padding: "10px 16px", borderRadius: "10px",
+                  background: TYPE_COLORS.habit.bg, borderLeft: `3px solid ${TYPE_COLORS.habit.dot}`,
+                  display: "flex", alignItems: "center", gap: "8px",
+                }}>
+                  <span style={{ fontSize: "13px" }}>⟡</span>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: TYPE_COLORS.habit.text }}>
+                    Habits: {dayHabits.completed}/{dayHabits.total}
+                  </span>
+                  <div style={{ display: "flex", gap: "3px", marginLeft: "4px" }}>
+                    {dayHabits.habits.filter(h => h.done).slice(0, 5).map((h, i) => (
+                      <span key={i} style={{ fontSize: "10px" }}>{h.icon}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Countdowns */}
+              {dayCountdowns.map(c => (
+                <div key={`cd-${c.id}`} style={{
+                  padding: "10px 16px", borderRadius: "10px",
+                  background: `${c.color}10`, borderLeft: `3px solid ${c.color}`,
+                  display: "flex", alignItems: "center", gap: "8px",
+                }}>
+                  <span style={{ fontSize: "14px" }}>{c.icon}</span>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: c.color }}>{c.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         )
@@ -591,8 +725,9 @@ function AgendaView({ events, tasksWithDates, onEventClick }: {
 /* ══════════════════════════════════════
    SIDEBAR — Today's events + upcoming
 ══════════════════════════════════════ */
-function CalendarSidebar({ events, selectedDate, onEventClick, onCreateEvent }: {
+function CalendarSidebar({ events, selectedDate, habitSummary, countdowns, onEventClick, onCreateEvent }: {
   events: CalendarEvent[]; selectedDate: string
+  habitSummary: Record<string, DayHabitSummary>; countdowns: CountdownItem[]
   onEventClick: (e: CalendarEvent) => void; onCreateEvent: (date: string) => void
 }) {
   const todayStr = toDateStr(new Date())
@@ -659,6 +794,57 @@ function CalendarSidebar({ events, selectedDate, onEventClick, onCreateEvent }: 
           </div>
         )}
 
+        {/* Habit summary for selected day */}
+        {(() => {
+          const dh = habitSummary[displayDate]
+          if (!dh || dh.total === 0) return null
+          return (
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "6px" }}>
+                Habits
+              </div>
+              <div style={{
+                padding: "10px 12px", borderRadius: "10px",
+                background: TYPE_COLORS.habit.bg, borderLeft: `2.5px solid ${TYPE_COLORS.habit.dot}`,
+              }}>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: TYPE_COLORS.habit.text, marginBottom: "6px" }}>
+                  {dh.completed}/{dh.total} completed
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                  {dh.habits.map((h, i) => (
+                    <span key={i} style={{
+                      padding: "2px 6px", borderRadius: "4px", fontSize: "9px", fontWeight: 600,
+                      background: h.done ? `${h.color}20` : "var(--glass-bg)",
+                      color: h.done ? h.color : "var(--text-tertiary)",
+                      border: `1px solid ${h.done ? `${h.color}30` : "var(--glass-border)"}`,
+                    }}>{h.icon} {h.name}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Countdown events for selected day */}
+        {countdowns.filter(c => c.date === displayDate).length > 0 && (
+          <div style={{ marginTop: "16px" }}>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "6px" }}>
+              Countdowns
+            </div>
+            {countdowns.filter(c => c.date === displayDate).map(c => (
+              <div key={c.id} style={{
+                padding: "8px 10px", borderRadius: "8px", marginBottom: "4px",
+                background: `${c.color}10`, borderLeft: `2.5px solid ${c.color}`,
+              }}>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: c.color, display: "flex", alignItems: "center", gap: "4px" }}>
+                  {c.icon} {c.label}
+                </div>
+                {c.notes && <div style={{ fontSize: "9px", color: "var(--text-tertiary)", marginTop: "2px" }}>{c.notes}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Upcoming section */}
         {upcoming.length > 0 && (
           <div style={{ marginTop: "20px" }}>
@@ -709,16 +895,66 @@ export default function Calendar() {
   const { tasks } = useTasksStore()
   const tasksWithDates = tasks.filter(t => t.due_date)
 
+  const { habits, logs, loadHabits, loadLogs } = useHabitsStore()
+
   const [modal, setModal] = useState<{ date: string; event?: CalendarEvent | null } | null>(null)
 
   const year  = currentDate.getFullYear()
   const month = currentDate.getMonth()
   const mk    = monthKey(currentDate)
 
+  // Load countdowns from localStorage
+  const [countdowns] = useState<CountdownItem[]>(loadCountdowns)
+
   useEffect(() => {
     loadEvents(mk)
     loadActiveDates(mk)
+    loadHabits()
   }, [mk])
+
+  // Load habit logs for the visible month range (with padding)
+  useEffect(() => {
+    const firstDay = `${year}-${String(month + 1).padStart(2, "0")}-01`
+    const lastDay = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth(year, month)).padStart(2, "0")}`
+    loadLogs(firstDay, lastDay)
+  }, [year, month])
+
+  // Build habit summary per day
+  const habitSummary = useMemo<Record<string, DayHabitSummary>>(() => {
+    if (habits.length === 0) return {}
+    const summary: Record<string, DayHabitSummary> = {}
+    const activeHabits = habits.filter(h => !h.archived)
+
+    // Build log index: date -> set of completed habit_ids
+    const logIndex: Record<string, Set<number>> = {}
+    for (const log of logs) {
+      if (!logIndex[log.date]) logIndex[log.date] = new Set()
+      logIndex[log.date].add(log.habit_id)
+    }
+
+    // For each day in the current month
+    const totalDays = daysInMonth(year, month)
+    for (let d = 1; d <= totalDays; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+      const completedIds = logIndex[dateStr] ?? new Set()
+      const dayHabits = activeHabits
+        .filter(h => !h.start_date || h.start_date <= dateStr)
+        .map(h => ({
+          name: h.name,
+          icon: h.icon,
+          color: h.color,
+          done: completedIds.has(h.id),
+        }))
+      if (dayHabits.length > 0) {
+        summary[dateStr] = {
+          completed: dayHabits.filter(h => h.done).length,
+          total: dayHabits.length,
+          habits: dayHabits,
+        }
+      }
+    }
+    return summary
+  }, [habits, logs, year, month])
 
   const handleSelectDate = (date: string) => {
     setSelectedDate(date)
@@ -799,6 +1035,16 @@ export default function Calendar() {
                 🔔 {remindersCount}
               </span>
             )}
+            {habits.filter(h => !h.archived).length > 0 && (
+              <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "6px", background: TYPE_COLORS.habit.bg, border: `1px solid ${TYPE_COLORS.habit.border}`, color: TYPE_COLORS.habit.text, fontWeight: 600 }}>
+                ⟡ {habits.filter(h => !h.archived).length} habit{habits.filter(h => !h.archived).length !== 1 ? "s" : ""}
+              </span>
+            )}
+            {countdowns.length > 0 && (
+              <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "6px", background: TYPE_COLORS.countdown.bg, border: `1px solid ${TYPE_COLORS.countdown.border}`, color: TYPE_COLORS.countdown.text, fontWeight: 600 }}>
+                ⏳ {countdowns.length}
+              </span>
+            )}
           </div>
         </div>
 
@@ -836,6 +1082,7 @@ export default function Calendar() {
           {view === "month" && (
             <MonthView year={year} month={month} events={events}
               selectedDate={selectedDate} tasksWithDates={tasksWithDates}
+              habitSummary={habitSummary} countdowns={countdowns}
               onSelectDate={handleSelectDate} onEventClick={handleEventClick}
               onCreateEvent={handleCreateEvent} />
           )}
@@ -845,16 +1092,19 @@ export default function Calendar() {
           )}
           {view === "day" && (
             <DayView date={selectedDate} events={events} tasksWithDates={tasksWithDates}
+              habitSummary={habitSummary} countdowns={countdowns}
               onEventClick={handleEventClick} />
           )}
           {view === "agenda" && (
             <AgendaView events={events} tasksWithDates={tasksWithDates}
+              habitSummary={habitSummary} countdowns={countdowns}
               onEventClick={handleEventClick} />
           )}
         </div>
 
         {/* Right sidebar — selected day detail */}
         <CalendarSidebar events={events} selectedDate={selectedDate}
+          habitSummary={habitSummary} countdowns={countdowns}
           onEventClick={handleEventClick} onCreateEvent={handleCreateEvent} />
       </div>
 

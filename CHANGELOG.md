@@ -5,6 +5,83 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.0.0] - 2026-03-08
+
+### Added
+
+- **Spotify shuffle toggle:** Shuffle on/off button in playback controls with visual active state. Uses `PUT /me/player/shuffle` via new `spotify:setShuffle` bridge channel and `spotify_set_shuffle` backend command.
+- **Spotify repeat/loop control:** Repeat button cycles through off → context (all) → track (single-song loop) → off. Uses `PUT /me/player/repeat` via `spotify:setRepeat` bridge channel. Active mode shown with green highlight and dot indicator; track-repeat shows a "1" badge icon.
+- **Spotify playback state includes shuffle/repeat:** `spotify_get_playback` now returns `shuffle_state` (bool) and `repeat_state` ("off"/"context"/"track") from the Spotify Web API response. UI state auto-refreshes after toggling.
+- **Habits module production-ready (Phase 2):**
+  - **Section-based grouping:** Habits can be organized into collapsible sections (e.g. "Health", "Learning"). Uncategorized habits are grouped together.
+  - **Goal types:** "Build" habits (`at_least` — reach target) and "Break" habits (`at_most` — stay under limit). Break habits show green for zero-count days and red for exceeding threshold.
+  - **Advanced fields:** `section`, `start_date`, `reminder_time`, `goal_type`, `sort_order`, `notes` columns added via safe ALTER TABLE migrations.
+  - **Backend streak computation:** New `habits_streak` command calculates current streak, best streak, total completions, and completion rate from full log history using date-walking algorithm. Supports both `at_least` and `at_most` goal types.
+  - **Archive management:** View archived habits in a slide-out panel, restore to active tracking, or permanently delete (cascades logs).
+  - **Monthly calendar heatmap view:** Toggle between week grid and month heatmap per habit. Shows intensity-based coloring with day numbers.
+  - **Edit modal:** Full editing of all habit fields — name, icon, color, target, frequency, goal type, section, reminder time, notes.
+  - **Stats/detail modal:** Click any habit to see current streak, best streak, total completions, completion rate, creation date, and notes.
+  - **Week navigation:** Navigate to past weeks with arrow controls; "Today" button snaps back.
+  - **Dynamic update system:** Uses single `UPDATE SET` query with dynamic clause building instead of multiple individual UPDATE calls.
+  - **New commands:** `habits_list_archived`, `habits_restore`, `habits_streak`; expanded `habits_create` and `habits_update` with all new fields.
+  - **New bridge channels:** `habits:listArchived`, `habits:restore`, `habits:streak`
+  - **Input validation:** Date format (YYYY-MM-DD), time format (HH:MM), goal_type enum, frequency enum — validated in Rust before DB write.
+- **Task archive system (Phase 3):**
+  - **Archive column + migration:** New `archived INTEGER NOT NULL DEFAULT 0` column on tasks table with CHECK constraint. Active task list (`tasks_list`) now excludes archived rows. Safe ALTER TABLE migration with rebuild-guard integration.
+  - **Individual task archiving:** Done tasks show an archive button (📦) on hover next to the delete button. Archiving hides the task from the board while preserving it in the DB.
+  - **Bulk "Archive All Done":** Button appears in the Done column header when completed tasks exist. One click archives all done tasks via `tasks_archive_done` (returns count of archived rows).
+  - **Archive panel:** Accessible from page header. Slide-down panel lists all archived tasks with completed date, "Restore" (resets to todo status + clears completed_at), and "Delete" (permanent) actions.
+  - **Restore flow:** Restored tasks return to "todo" status with `completed_at` cleared — ready for re-work.
+  - **New commands:** `tasks_archive`, `tasks_archive_done`, `tasks_restore`, `tasks_list_archived`
+  - **New bridge channels:** `tasks:archive`, `tasks:archiveDone`, `tasks:restore`, `tasks:listArchived`
+  - **4 new tests:** `archive_hides_from_active_list`, `archive_missing_task_returns_err`, `restore_resets_to_todo`, `archive_done_bulk`
+- **Unified calendar integration (Phase 4):**
+  - **Habit completion on calendar:** Monthly calendar cells show daily habit completion indicators (e.g. "⟡ 3/5") with green highlight when all habits completed. Day view shows full habit breakdown with per-habit colored pills.
+  - **Countdown events on calendar:** Countdown target dates appear as colored markers on month grid cells, full cards in day/agenda views, and sidebar detail sections.
+  - **Calendar sidebar integration:** Selected-day sidebar now shows habits summary (completion count + per-habit status) and countdown events alongside calendar events.
+  - **Agenda view enrichment:** Agenda now includes habit summaries and countdown events alongside calendar events and tasks. Date list includes all dates with any data source.
+  - **Data source badges:** Calendar header shows live badge counts for events, reminders, active habits, and countdown events.
+  - **No new backend commands needed:** Leverages existing `habits:allLogs` and localStorage countdown data.
+- **Sidebar layout redesign (Phase 5):**
+  - **Collapsible sidebar:** Toggle between full (200px) and mini (60px, icon-only) modes. Click the logo icon or use Ctrl+B. State persisted in localStorage.
+  - **Grouped navigation sections:** Nav items organized into "Workspace" (Dashboard, Tasks, Notes) and "Tracking" (Timer, Calendar, Habits, Countdown) with section headers in expanded mode and divider lines in collapsed mode.
+  - **Quick stat badges:** Tasks and Habits nav items show live count badges (active task count, active habit count) in expanded mode. Collapsed mode shows accent-colored dot indicators.
+  - **Collapse toggle button:** Explicit "Collapse" button with chevron icon at bottom of nav area (expanded mode), expand chevron in collapsed mode.
+  - **Spotify hidden when collapsed:** Spotify player section hidden in collapsed mode to prevent layout overflow.
+  - **Responsive UserProfileCard:** Avatar-only view in collapsed mode; full card with name/status/chevron in expanded mode.
+- **Spotify integration (PKCE + Web Playback SDK):** Full Spotify OAuth flow using PKCE with local loopback server on `127.0.0.1:43821`. In-app playback via Web Playback SDK. Play/pause/next/prev controls, volume slider, and album art display in the sidebar player widget.
+- **Spotify playlist picker:** Browse and play from Spotify playlists directly in the sidebar. Shows playlist thumbnails, track counts, and one-click playback.
+- **Environment-based Spotify config:** Client ID and redirect URI loaded from `.env` at compile time via `dotenvy` + `build.rs`. CI uses GitHub Secrets.
+- **Three new custom themes:**
+  - **Black & Red:** High-contrast dark with vivid red (#E31C25) accents
+  - **Smooth Blues:** Deep ocean base with bright blue (#1187D7) highlights
+  - **Warm Red & Blue:** Bold dual-accent with red (#D50000) and blue (#3168B9)
+- **Task subtasks:** Tasks can have parent-child relationships via `parent_id` column
+- **Task priority (Eisenhower matrix):** Tasks support `urgent-important`, `important`, `urgent`, `neither` priority levels
+- **Task description:** Tasks now have an optional description field for notes/details
+- **Task custom ordering:** `sort_order` column enables drag-to-reorder with batch updates
+- **Task reorder API:** New `tasks:reorder` bridge channel for batch sort order updates
+
+### Fixed
+
+- **Sidebar Spotify/profile overlap:** Playlist panel no longer pushes the user profile card off-screen. Spotify section is now in a scroll-contained flex wrapper with `overflow-y: auto` and `flex-shrink: 1`, while the profile card has `flex-shrink: 0` to remain always visible at the bottom. Works correctly on small-height windows.
+- **P0 Bug: "Open Notes Folder" not working:** Added directory existence check before opening with Explorer. If the notes directory was externally deleted, it is now recreated automatically.
+- **P0 Bug: Updater install/replace flow:** Updater now detects the current installation directory via `std::env::current_exe()` and passes `/D=<dir>` to the NSIS silent installer, ensuring the new version replaces the old one in the same location.
+- **Windows URL parsing in Spotify auth:** Replaced `cmd /C start` (which splits URLs on `&`) with the `webbrowser` crate for reliable URL opening on all platforms.
+
+### Removed
+
+- **macOS support:** Removed macOS build jobs from CI, macOS bundle config from `tauri.conf.json`, macOS-specific code paths from `updater.rs` and `notes.rs`. ChroniNotes is now Windows-only.
+- **DMG installer handling:** Removed `.dmg` file validation and macOS DMG launch code from the updater.
+
+### Changed
+
+- Bundle targets restricted from `"all"` to `["nsis", "msi"]` (Windows only)
+- Task list now sorted by `sort_order ASC, created_at DESC` (was `created_at DESC` only)
+- Total test count increased from 103 to 114 (2 Spotify tests, 5 habits tests, 4 task archive tests)
+
+---
+
 ## [2.5.0] - 2026-03-04
 
 ### Added

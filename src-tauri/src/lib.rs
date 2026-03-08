@@ -1,29 +1,31 @@
-mod db;
 mod commands;
+mod db;
 mod notifications;
 mod updater;
 
+use commands::notes::NotesRoot;
+use commands::spotify::SpotifyAuthState;
+use commands::timer::TimerState;
+use db::Database;
 use std::sync::Arc;
 use tauri::Manager;
-use db::Database;
-use commands::timer::TimerState;
-use commands::notes::NotesRoot;
 
 #[cfg(target_os = "windows")]
 fn set_window_icon_win32(window: &tauri::WebviewWindow) {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SendMessageW, ICON_BIG, ICON_SMALL, WM_SETICON,
-        LoadImageW, IMAGE_ICON, LR_LOADFROMFILE, LR_DEFAULTSIZE,
-    };
     use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        LoadImageW, SendMessageW, ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_DEFAULTSIZE,
+        LR_LOADFROMFILE, WM_SETICON,
+    };
 
     // Embed the .ico at compile time, write to temp so LoadImageW can read it.
     let ico_bytes = include_bytes!("../icons/ChroniNotes.ico");
     let tmp = std::env::temp_dir().join("chroninotes_icon.ico");
     std::fs::write(&tmp, ico_bytes).ok();
 
-    let path_wide: Vec<u16> = tmp.to_string_lossy()
+    let path_wide: Vec<u16> = tmp
+        .to_string_lossy()
         .encode_utf16()
         .chain(std::iter::once(0u16))
         .collect();
@@ -39,14 +41,16 @@ fn set_window_icon_win32(window: &tauri::WebviewWindow) {
             std::ptr::null_mut(),
             path_wide.as_ptr(),
             IMAGE_ICON,
-            0, 0,
+            0,
+            0,
             LR_LOADFROMFILE | LR_DEFAULTSIZE,
         );
         let hicon_small = LoadImageW(
             std::ptr::null_mut(),
             path_wide.as_ptr(),
             IMAGE_ICON,
-            16, 16,
+            16,
+            16,
             LR_LOADFROMFILE,
         );
 
@@ -93,6 +97,16 @@ pub fn run() {
             let notes_root = NotesRoot::new(&app_data_dir);
             app.manage(notes_root);
 
+            // Spotify PKCE auth state (holds the code_verifier between
+            // login initiation and the OAuth callback).
+            app.manage(SpotifyAuthState::new());
+
+            // Ensure the Spotify tokens table exists.
+            {
+                let db_ref = app.state::<Database>();
+                commands::spotify::ensure_spotify_schema(&db_ref);
+            }
+
             // TimerState::new() returns Arc<TimerState>; manage the Arc so
             // commands can clone it cheaply into background threads without
             // any unsafe pointer arithmetic.
@@ -128,11 +142,31 @@ pub fn run() {
             // Tasks
             commands::tasks::tasks_create,
             commands::tasks::tasks_list,
+            commands::tasks::tasks_list_archived,
             commands::tasks::tasks_update_status,
             commands::tasks::tasks_update_due_date,
             commands::tasks::tasks_delete,
             commands::tasks::tasks_completion_history,
             commands::tasks::tasks_with_due_dates,
+            commands::tasks::tasks_update_priority,
+            commands::tasks::tasks_update_description,
+            commands::tasks::tasks_reorder,
+            commands::tasks::tasks_archive,
+            commands::tasks::tasks_archive_done,
+            commands::tasks::tasks_restore,
+            // Habits
+            commands::habits::habits_create,
+            commands::habits::habits_list,
+            commands::habits::habits_list_archived,
+            commands::habits::habits_update,
+            commands::habits::habits_archive,
+            commands::habits::habits_restore,
+            commands::habits::habits_delete,
+            commands::habits::habits_log,
+            commands::habits::habits_unlog,
+            commands::habits::habits_logs_range,
+            commands::habits::habits_all_logs,
+            commands::habits::habits_streak,
             // Timer / Pomodoro / Stopwatch
             commands::timer::pomodoro_get_settings,
             commands::timer::pomodoro_update_settings,
@@ -173,6 +207,23 @@ pub fn run() {
             // Updater
             updater::updater_check,
             updater::updater_download_and_install,
+            // Spotify
+            commands::spotify::spotify_auth_status,
+            commands::spotify::spotify_get_access_token,
+            commands::spotify::spotify_login,
+            commands::spotify::spotify_logout,
+            commands::spotify::spotify_set_active_device,
+            commands::spotify::spotify_get_playback,
+            commands::spotify::spotify_play,
+            commands::spotify::spotify_pause,
+            commands::spotify::spotify_next,
+            commands::spotify::spotify_previous,
+            commands::spotify::spotify_set_volume,
+            commands::spotify::spotify_set_shuffle,
+            commands::spotify::spotify_set_repeat,
+            commands::spotify::spotify_get_devices,
+            commands::spotify::spotify_get_playlists,
+            commands::spotify::spotify_play_playlist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

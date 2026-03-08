@@ -1,10 +1,11 @@
-use serde::{Deserialize, Serialize};
-use rusqlite::params;
-use tauri::State;
-use chrono::NaiveDate;
 use crate::db::Database;
+use chrono::NaiveDate;
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use tauri::State;
 
 const VALID_STATUSES: &[&str] = &["todo", "in-progress", "done"];
+const VALID_PRIORITIES: &[&str] = &["urgent-important", "important", "urgent", "neither"];
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
@@ -14,6 +15,11 @@ pub struct Task {
     pub created_at: Option<String>,
     pub completed_at: Option<String>,
     pub due_date: Option<String>,
+    pub parent_id: Option<i64>,
+    pub sort_order: i64,
+    pub priority: Option<String>,
+    pub description: Option<String>,
+    pub archived: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,10 +80,12 @@ fn validate_date(date: &str) -> Result<(), String> {
     // Stage 2: real calendar date check.
     NaiveDate::parse_from_str(date, "%Y-%m-%d")
         .map(|_| ())
-        .map_err(|_| format!(
-            "Date '{}' is not a valid calendar date (e.g. Feb 30 or month 13 are rejected)",
-            date
-        ))
+        .map_err(|_| {
+            format!(
+                "Date '{}' is not a valid calendar date (e.g. Feb 30 or month 13 are rejected)",
+                date
+            )
+        })
 }
 
 /* ── Commands ── */
@@ -86,12 +94,30 @@ fn validate_date(date: &str) -> Result<(), String> {
 // The `#[tauri::command]` functions are thin wrappers so the core logic is
 // fully unit-testable without Tauri's State machinery.
 
-pub(crate) fn tasks_create_inner(title: String, db: &Database) -> Result<Task, String> {
+pub(crate) fn tasks_create_inner(title: String, parent_id: Option<i64>, db: &Database) -> Result<Task, String> {
     validate_title(&title)?;
 
     let conn = db.conn().lock().map_err(|e| e.to_string())?;
-    conn.execute("INSERT INTO tasks (title) VALUES (?1)", params![title])
-        .map_err(|e| e.to_string())?;
+
+    // Validate parent exists if specified
+    if let Some(pid) = parent_id {
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = ?1)",
+                params![pid],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if !exists {
+            return Err(format!("Parent task {} not found", pid));
+        }
+    }
+
+    conn.execute(
+        "INSERT INTO tasks (title, parent_id) VALUES (?1, ?2)",
+        params![title, parent_id],
+    )
+    .map_err(|e| e.to_string())?;
     let id = conn.last_insert_rowid();
     Ok(Task {
         id,
@@ -100,12 +126,17 @@ pub(crate) fn tasks_create_inner(title: String, db: &Database) -> Result<Task, S
         created_at: None,
         completed_at: None,
         due_date: None,
+        parent_id,
+        sort_order: 0,
+        priority: None,
+        description: None,
+        archived: false,
     })
 }
 
 #[tauri::command]
-pub fn tasks_create(title: String, db: State<Database>) -> Result<Task, String> {
-    tasks_create_inner(title, db.inner())
+pub fn tasks_create(title: String, parent_id: Option<i64>, db: State<Database>) -> Result<Task, String> {
+    tasks_create_inner(title, parent_id, db.inner())
 }
 
 #[tauri::command]
@@ -113,24 +144,34 @@ pub fn tasks_list(db: State<Database>) -> Result<Vec<Task>, String> {
     let conn = db.conn().lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, status, created_at, completed_at, due_date
-             FROM tasks ORDER BY created_at DESC",
+            "SELECT id, title, status, created_at, completed_at, due_date,
+                    parent_id, sort_order, priority, description,
+                    COALESCE(archived, 0) as archived
+             FROM tasks
+             WHERE COALESCE(archived, 0) = 0
+             ORDER BY sort_order ASC, created_at DESC",
         )
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(Task {
-            id:           row.get(0)?,
-            title:        row.get(1)?,
-            status:       row.get(2)?,
-            created_at:   row.get(3)?,
-            completed_at: row.get(4)?,
-            due_date:     row.get(5)?,
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(Task {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                status: row.get(2)?,
+                created_at: row.get(3)?,
+                completed_at: row.get(4)?,
+                due_date: row.get(5)?,
+                parent_id: row.get(6)?,
+                sort_order: row.get(7)?,
+                priority: row.get(8)?,
+                description: row.get(9)?,
+                archived: row.get::<_, i64>(10)? != 0,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string());
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
     rows
 }
 
@@ -228,12 +269,16 @@ pub fn tasks_completion_history(db: State<Database>) -> Result<Vec<DayActivity>,
         )
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(DayActivity { date: row.get(0)?, count: row.get(1)? })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string());
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(DayActivity {
+                date: row.get(0)?,
+                count: row.get(1)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
     rows
 }
 
@@ -249,17 +294,191 @@ pub fn tasks_with_due_dates(db: State<Database>) -> Result<Vec<TaskWithDueDate>,
         )
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(TaskWithDueDate {
-            id:       row.get(0)?,
-            title:    row.get(1)?,
-            status:   row.get(2)?,
-            due_date: row.get(3)?,
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(TaskWithDueDate {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                status: row.get(2)?,
+                due_date: row.get(3)?,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string());
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
+    rows
+}
+
+/// Update a task's priority (Eisenhower matrix quadrant).
+pub(crate) fn tasks_update_priority_inner(
+    id: i64,
+    priority: Option<String>,
+    db: &Database,
+) -> Result<(), String> {
+    if let Some(ref p) = priority {
+        if !VALID_PRIORITIES.contains(&p.as_str()) {
+            return Err(format!(
+                "Invalid priority '{}'. Allowed: {}",
+                p,
+                VALID_PRIORITIES.join(", ")
+            ));
+        }
+    }
+
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "UPDATE tasks SET priority = ?1 WHERE id = ?2",
+            params![priority, id],
+        )
+        .map_err(|e| e.to_string())?;
+
+    if affected == 0 {
+        return Err(format!("Task {} not found", id));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn tasks_update_priority(
+    id: i64,
+    priority: Option<String>,
+    db: State<Database>,
+) -> Result<(), String> {
+    tasks_update_priority_inner(id, priority, db.inner())
+}
+
+/// Update a task's description.
+#[tauri::command]
+pub fn tasks_update_description(
+    id: i64,
+    description: Option<String>,
+    db: State<Database>,
+) -> Result<(), String> {
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "UPDATE tasks SET description = ?1 WHERE id = ?2",
+            params![description, id],
+        )
+        .map_err(|e| e.to_string())?;
+
+    if affected == 0 {
+        return Err(format!("Task {} not found", id));
+    }
+    Ok(())
+}
+
+/// Reorder tasks by setting sort_order for a batch of task IDs.
+#[tauri::command]
+pub fn tasks_reorder(
+    task_orders: Vec<(i64, i64)>,
+    db: State<Database>,
+) -> Result<(), String> {
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
+    for (id, order) in &task_orders {
+        conn.execute(
+            "UPDATE tasks SET sort_order = ?1 WHERE id = ?2",
+            params![order, id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+// ── Archive commands ─────────────────────────────────────────────────────────
+
+/// Archive a single task (hide from active list but keep in DB).
+pub(crate) fn tasks_archive_inner(id: i64, db: &Database) -> Result<(), String> {
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "UPDATE tasks SET archived = 1 WHERE id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+    if affected == 0 {
+        return Err(format!("Task {} not found", id));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn tasks_archive(id: i64, db: State<Database>) -> Result<(), String> {
+    tasks_archive_inner(id, db.inner())
+}
+
+/// Archive all tasks with status 'done'.
+pub(crate) fn tasks_archive_done_inner(db: &Database) -> Result<i64, String> {
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "UPDATE tasks SET archived = 1 WHERE status = 'done' AND COALESCE(archived, 0) = 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(affected as i64)
+}
+
+#[tauri::command]
+pub fn tasks_archive_done(db: State<Database>) -> Result<i64, String> {
+    tasks_archive_done_inner(db.inner())
+}
+
+/// Restore an archived task (un-archive). Resets status to 'todo'.
+pub(crate) fn tasks_restore_inner(id: i64, db: &Database) -> Result<(), String> {
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "UPDATE tasks SET archived = 0, status = 'todo', completed_at = NULL WHERE id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+    if affected == 0 {
+        return Err(format!("Task {} not found", id));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn tasks_restore(id: i64, db: State<Database>) -> Result<(), String> {
+    tasks_restore_inner(id, db.inner())
+}
+
+/// List all archived tasks.
+#[tauri::command]
+pub fn tasks_list_archived(db: State<Database>) -> Result<Vec<Task>, String> {
+    let conn = db.conn().lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, status, created_at, completed_at, due_date,
+                    parent_id, sort_order, priority, description,
+                    COALESCE(archived, 0) as archived
+             FROM tasks
+             WHERE COALESCE(archived, 0) = 1
+             ORDER BY completed_at DESC, created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(Task {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                status: row.get(2)?,
+                created_at: row.get(3)?,
+                completed_at: row.get(4)?,
+                due_date: row.get(5)?,
+                parent_id: row.get(6)?,
+                sort_order: row.get(7)?,
+                priority: row.get(8)?,
+                description: row.get(9)?,
+                archived: row.get::<_, i64>(10)? != 0,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
     rows
 }
 
@@ -321,7 +540,10 @@ mod tests {
         assert!(validate_date("2026-99-99").is_err(), "month 99 must fail");
         assert!(validate_date("2026-13-01").is_err(), "month 13 must fail");
         assert!(validate_date("2024-02-30").is_err(), "Feb 30 must fail");
-        assert!(validate_date("2023-02-29").is_err(), "Feb 29 non-leap must fail");
+        assert!(
+            validate_date("2023-02-29").is_err(),
+            "Feb 29 non-leap must fail"
+        );
     }
 
     // ── Command-level contract tests (via _inner helpers) ─────────────────────
@@ -330,7 +552,7 @@ mod tests {
     #[test]
     fn command_create_rejects_empty_title() {
         let (_dir, db) = test_db();
-        let err = tasks_create_inner("  ".to_string(), &db).unwrap_err();
+        let err = tasks_create_inner("  ".to_string(), None, &db).unwrap_err();
         assert!(err.contains("empty"), "error must mention empty: {err}");
     }
 
@@ -338,7 +560,7 @@ mod tests {
     #[test]
     fn tasks_create_and_list_roundtrip() {
         let (_dir, db) = test_db();
-        let task = tasks_create_inner("Test task".to_string(), &db).unwrap();
+        let task = tasks_create_inner("Test task".to_string(), None, &db).unwrap();
         assert_eq!(task.title, "Test task");
         assert_eq!(task.status, "todo");
         assert!(task.id > 0);
@@ -348,15 +570,17 @@ mod tests {
     #[test]
     fn command_update_status_done() {
         let (_dir, db) = test_db();
-        let task = tasks_create_inner("Status test".to_string(), &db).unwrap();
+        let task = tasks_create_inner("Status test".to_string(), None, &db).unwrap();
         tasks_update_status_inner(task.id, "done".to_string(), &db).unwrap();
 
         let conn = db.conn().lock().unwrap();
-        let (status, completed): (String, Option<String>) = conn.query_row(
-            "SELECT status, completed_at FROM tasks WHERE id = ?1",
-            rusqlite::params![task.id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        ).unwrap();
+        let (status, completed): (String, Option<String>) = conn
+            .query_row(
+                "SELECT status, completed_at FROM tasks WHERE id = ?1",
+                rusqlite::params![task.id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
         assert_eq!(status, "done");
         assert!(completed.is_some(), "completed_at must be set");
     }
@@ -374,7 +598,7 @@ mod tests {
     #[test]
     fn command_update_status_invalid_status_returns_err() {
         let (_dir, db) = test_db();
-        let task = tasks_create_inner("Validation test".to_string(), &db).unwrap();
+        let task = tasks_create_inner("Validation test".to_string(), None, &db).unwrap();
         let err = tasks_update_status_inner(task.id, "DONE".to_string(), &db).unwrap_err();
         assert!(err.contains("DONE") || err.contains("Invalid"), "{err}");
     }
@@ -383,15 +607,17 @@ mod tests {
     #[test]
     fn command_update_due_date_valid() {
         let (_dir, db) = test_db();
-        let task = tasks_create_inner("Due date test".to_string(), &db).unwrap();
+        let task = tasks_create_inner("Due date test".to_string(), None, &db).unwrap();
         tasks_update_due_date_inner(task.id, Some("2025-12-31".to_string()), &db).unwrap();
 
         let conn = db.conn().lock().unwrap();
-        let due: String = conn.query_row(
-            "SELECT due_date FROM tasks WHERE id = ?1",
-            rusqlite::params![task.id],
-            |r| r.get(0),
-        ).unwrap();
+        let due: String = conn
+            .query_row(
+                "SELECT due_date FROM tasks WHERE id = ?1",
+                rusqlite::params![task.id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(due, "2025-12-31");
     }
 
@@ -399,13 +625,9 @@ mod tests {
     #[test]
     fn command_update_due_date_impossible_date_rejected() {
         let (_dir, db) = test_db();
-        let task = tasks_create_inner("Date test".to_string(), &db).unwrap();
-        let err = tasks_update_due_date_inner(
-            task.id,
-            Some("2025-13-99".to_string()),
-            &db,
-        )
-        .unwrap_err();
+        let task = tasks_create_inner("Date test".to_string(), None, &db).unwrap();
+        let err =
+            tasks_update_due_date_inner(task.id, Some("2025-13-99".to_string()), &db).unwrap_err();
         assert!(err.contains("2025-13-99") || err.contains("valid"), "{err}");
     }
 
@@ -421,15 +643,17 @@ mod tests {
     #[test]
     fn command_delete_existing_task() {
         let (_dir, db) = test_db();
-        let task = tasks_create_inner("To delete".to_string(), &db).unwrap();
+        let task = tasks_create_inner("To delete".to_string(), None, &db).unwrap();
         tasks_delete_inner(task.id, &db).unwrap();
 
         let conn = db.conn().lock().unwrap();
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM tasks WHERE id = ?1",
-            rusqlite::params![task.id],
-            |r| r.get(0),
-        ).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tasks WHERE id = ?1",
+                rusqlite::params![task.id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 0);
     }
 
@@ -439,5 +663,150 @@ mod tests {
         let (_dir, db) = test_db();
         let err = tasks_delete_inner(9999, &db).unwrap_err();
         assert!(err.contains("9999"), "error must mention the id: {err}");
+    }
+
+    // ── Subtask tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn subtask_creation_with_valid_parent() {
+        let (_dir, db) = test_db();
+        let parent = tasks_create_inner("Parent".to_string(), None, &db).unwrap();
+        let child = tasks_create_inner("Child".to_string(), Some(parent.id), &db).unwrap();
+        assert_eq!(child.parent_id, Some(parent.id));
+    }
+
+    #[test]
+    fn subtask_creation_with_invalid_parent_rejected() {
+        let (_dir, db) = test_db();
+        let err = tasks_create_inner("Orphan".to_string(), Some(9999), &db).unwrap_err();
+        assert!(err.contains("9999"), "error must mention the parent id: {err}");
+    }
+
+    // ── Priority tests ───────────────────────────────────────────────────────
+
+    #[test]
+    fn valid_priority_accepted() {
+        let (_dir, db) = test_db();
+        let task = tasks_create_inner("Priority test".to_string(), None, &db).unwrap();
+        tasks_update_priority_inner(task.id, Some("urgent-important".to_string()), &db).unwrap();
+
+        let conn = db.conn().lock().unwrap();
+        let priority: String = conn
+            .query_row(
+                "SELECT priority FROM tasks WHERE id = ?1",
+                params![task.id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(priority, "urgent-important");
+    }
+
+    #[test]
+    fn invalid_priority_rejected() {
+        let (_dir, db) = test_db();
+        let task = tasks_create_inner("Priority test".to_string(), None, &db).unwrap();
+        let err = tasks_update_priority_inner(task.id, Some("HIGH".to_string()), &db).unwrap_err();
+        assert!(err.contains("HIGH") || err.contains("Invalid"), "{err}");
+    }
+
+    #[test]
+    fn null_priority_clears_value() {
+        let (_dir, db) = test_db();
+        let task = tasks_create_inner("Priority test".to_string(), None, &db).unwrap();
+        tasks_update_priority_inner(task.id, Some("important".to_string()), &db).unwrap();
+        tasks_update_priority_inner(task.id, None, &db).unwrap();
+
+        let conn = db.conn().lock().unwrap();
+        let priority: Option<String> = conn
+            .query_row(
+                "SELECT priority FROM tasks WHERE id = ?1",
+                params![task.id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(priority.is_none());
+    }
+
+    // ── Archive tests ────────────────────────────────────────────────────────
+
+    #[test]
+    fn archive_hides_from_active_list() {
+        let (_dir, db) = test_db();
+        let task = tasks_create_inner("Archive me".to_string(), None, &db).unwrap();
+        tasks_update_status_inner(task.id, "done".to_string(), &db).unwrap();
+        tasks_archive_inner(task.id, &db).unwrap();
+
+        // Active list should be empty
+        let conn = db.conn().lock().unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tasks WHERE COALESCE(archived, 0) = 0",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+
+        // Archived list should have it
+        let archived_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tasks WHERE COALESCE(archived, 0) = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(archived_count, 1);
+    }
+
+    #[test]
+    fn archive_missing_task_returns_err() {
+        let (_dir, db) = test_db();
+        let err = tasks_archive_inner(9999, &db).unwrap_err();
+        assert!(err.contains("9999"));
+    }
+
+    #[test]
+    fn restore_resets_to_todo() {
+        let (_dir, db) = test_db();
+        let task = tasks_create_inner("Restore me".to_string(), None, &db).unwrap();
+        tasks_update_status_inner(task.id, "done".to_string(), &db).unwrap();
+        tasks_archive_inner(task.id, &db).unwrap();
+        tasks_restore_inner(task.id, &db).unwrap();
+
+        let conn = db.conn().lock().unwrap();
+        let (status, archived, completed): (String, i64, Option<String>) = conn
+            .query_row(
+                "SELECT status, COALESCE(archived, 0), completed_at FROM tasks WHERE id = ?1",
+                params![task.id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "todo");
+        assert_eq!(archived, 0);
+        assert!(completed.is_none(), "completed_at must be cleared");
+    }
+
+    #[test]
+    fn archive_done_bulk() {
+        let (_dir, db) = test_db();
+        let t1 = tasks_create_inner("Done 1".to_string(), None, &db).unwrap();
+        let t2 = tasks_create_inner("Done 2".to_string(), None, &db).unwrap();
+        let _t3 = tasks_create_inner("Still todo".to_string(), None, &db).unwrap();
+        tasks_update_status_inner(t1.id, "done".to_string(), &db).unwrap();
+        tasks_update_status_inner(t2.id, "done".to_string(), &db).unwrap();
+
+        let count = tasks_archive_done_inner(&db).unwrap();
+        assert_eq!(count, 2);
+
+        // Only "Still todo" should remain active
+        let conn = db.conn().lock().unwrap();
+        let active: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tasks WHERE COALESCE(archived, 0) = 0",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(active, 1);
     }
 }

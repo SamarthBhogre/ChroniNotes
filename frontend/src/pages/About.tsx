@@ -10,7 +10,7 @@ interface AboutProps {
  * package.json.  This is the single authoritative source — it matches
  * tauri.conf.json and Cargo.toml.
  */
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "2.3.0"
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "3.0.0"
 const BUILD_YEAR  = "2026"
 
 /* ── All keyboard shortcuts / commands ── */
@@ -23,6 +23,9 @@ const SHORTCUT_SECTIONS = [
       { keys: ["Ctrl", "3"], desc: "Go to Notes" },
       { keys: ["Ctrl", "4"], desc: "Go to Timer" },
       { keys: ["Ctrl", "5"], desc: "Go to Calendar" },
+      { keys: ["Ctrl", "6"], desc: "Go to Habits" },
+      { keys: ["Ctrl", "7"], desc: "Go to Countdown" },
+      { keys: ["Ctrl", "B"], desc: "Toggle sidebar collapse" },
     ],
   },
   {
@@ -55,6 +58,14 @@ const SHORTCUT_SECTIONS = [
     items: [
       { keys: ["Enter"], desc: "Add task (when input focused)" },
       { keys: ["Click ●"], desc: "Advance task status" },
+      { keys: ["Hover", "📦"], desc: "Archive a completed task" },
+    ],
+  },
+  {
+    title: "Habits",
+    items: [
+      { keys: ["Click ○"], desc: "Toggle habit completion for today" },
+      { keys: ["←  →"], desc: "Navigate weeks" },
     ],
   },
   {
@@ -67,13 +78,16 @@ const SHORTCUT_SECTIONS = [
 
 const FEATURES = [
   { icon: "⬡", title: "Dashboard", desc: "Daily progress ring, streaks, heatmap, quick navigation to all modules." },
-  { icon: "◈", title: "Kanban Tasks", desc: "Three-column board (To Do → In Progress → Done) with inline add, filter pills, click-to-advance status circles." },
+  { icon: "◈", title: "Kanban Tasks", desc: "Three-column board (To Do → In Progress → Done) with inline add, filter pills, click-to-advance status circles, and task archiving." },
   { icon: "◉", title: "Rich Notes", desc: "Notion-style nested pages and folders with a TipTap rich-text editor — headings, lists, code blocks, task lists, and more." },
   { icon: "⊹", title: "Timer Suite", desc: "Pomodoro timer, countdown timer with custom presets, and a stopwatch — all with session logging and focus history." },
-  { icon: "▦", title: "Calendar", desc: "Month, week, day, and agenda views. Create events with type-coding (event, reminder, focus, task) and desktop notification reminders." },
+  { icon: "▦", title: "Calendar", desc: "Month, week, day, and agenda views with unified habit/countdown integration. Create events with type-coding and desktop notification reminders." },
+  { icon: "⟡", title: "Habits", desc: "Daily habit tracker with streaks, heatmaps, build/break goal types, sections, archiving, and calendar-integrated completion indicators." },
+  { icon: "⏳", title: "Countdown", desc: "Visual countdown timers to important dates with progress bars, color-coded cards, and calendar integration." },
+  { icon: "🎵", title: "Spotify", desc: "Integrated Spotify playback controls — play/pause, skip, shuffle, repeat modes — right in the sidebar without leaving the app." },
   { icon: "🔔", title: "Reminders", desc: "Configurable desktop notifications for calendar events — 5 min, 15 min, 1 hour, or custom intervals before the event." },
-  { icon: "🎨", title: "5 Themes", desc: "Midnight Indigo, Steel Blue, Warm Linen, Ember, and Carbon — each with its own accent palette, glass effects, and background orbs." },
-  { icon: "⚡", title: "Optimized", desc: "Performance-first design with solid backgrounds, no heavy blur or GPU effects. Memory Saver unmounts inactive pages to free RAM." },
+  { icon: "🎨", title: "8 Themes", desc: "Midnight Indigo, Steel Blue, Warm Linen, Ember, Carbon, Black & Red, Smooth Blues, and Warm Red & Blue — each with its own palette." },
+  { icon: "⚡", title: "Optimized", desc: "Performance-first design with Memory Saver that unmounts inactive pages to free RAM. Collapsible sidebar for maximum workspace." },
   { icon: "💾", title: "Offline-First", desc: "All data stored locally in SQLite — no cloud, no accounts, no internet required. Your notes and tasks never leave your machine." },
 ]
 
@@ -198,9 +212,10 @@ export default function About({ onClose }: AboutProps) {
               }}>
                 <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0 }}>
                   <strong style={{ color: "var(--text-primary)" }}>ChroniNotes</strong> is an offline-first desktop
-                  productivity assistant built for students. Manage your tasks with a kanban board, write
-                  rich notes in a Notion-style editor, stay focused with Pomodoro timers, and track your
-                  schedule with an integrated calendar — all without ever needing an internet connection.
+                  productivity suite built for students. Manage your tasks with a kanban board, write
+                  rich notes in a Notion-style editor, stay focused with Pomodoro timers, build daily habits
+                  with streak tracking, set countdown timers to important dates, and plan your schedule with
+                  an integrated calendar — all with Spotify playback controls and without ever needing an internet connection.
                 </p>
                 <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "10px 0 0" }}>
                   Your data lives in a local SQLite database on your machine. No accounts, no cloud sync,
@@ -225,8 +240,8 @@ export default function About({ onClose }: AboutProps) {
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
                 {[
-                  { label: "Themes", value: "5", icon: "🎨" },
-                  { label: "Modules", value: "5", icon: "📦" },
+                  { label: "Themes", value: "8", icon: "🎨" },
+                  { label: "Modules", value: "7", icon: "📦" },
                   { label: "Storage", value: "Local", icon: "💾" },
                 ].map(({ label, value, icon }) => (
                   <div key={label} style={{

@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { open } from "@tauri-apps/plugin-shell"
 
 /**
  * Bridge layer: maps Electron-style IPC channel names → Tauri commands.
@@ -23,6 +22,10 @@ export interface Task {
   due_date?: string | null
   completed_at?: string | null
   created_at?: string
+  parent_id?: number | null
+  sort_order: number
+  priority?: string | null
+  description?: string | null
 }
 
 export interface DayActivity { date: string; count: number }
@@ -88,13 +91,85 @@ export interface UpdaterProgress { percent: number }
 
 const channelMap: Record<string, (payload?: unknown) => Promise<unknown>> = {
   // ── Tasks ──
-  "tasks:create":            (title) => invoke<Task>("tasks_create", { title }),
+  "tasks:create":            (p) => {
+    if (typeof p === "string") return invoke<Task>("tasks_create", { title: p })
+    const { title, parentId } = p as { title: string; parentId?: number | null }
+    return invoke<Task>("tasks_create", { title, parentId: parentId ?? null })
+  },
   "tasks:list":              ()      => invoke<Task[]>("tasks_list"),
   "tasks:updateStatus":      (p)     => { const { id, status } = p as { id: number; status: string }; return invoke<void>("tasks_update_status", { id, status }); },
   "tasks:updateDueDate":     (p)     => { const { id, due_date } = p as { id: number; due_date: string | null }; return invoke<void>("tasks_update_due_date", { id, dueDate: due_date }); },
+  "tasks:updatePriority":    (p)     => { const { id, priority } = p as { id: number; priority: string | null }; return invoke<void>("tasks_update_priority", { id, priority }); },
+  "tasks:updateDescription": (p)     => { const { id, description } = p as { id: number; description: string | null }; return invoke<void>("tasks_update_description", { id, description }); },
+  "tasks:reorder":           (p)     => invoke<void>("tasks_reorder", { taskOrders: p as [number, number][] }),
   "tasks:delete":            (id)    => invoke<void>("tasks_delete", { id }),
+  "tasks:archive":           (id)    => invoke<void>("tasks_archive", { id }),
+  "tasks:archiveDone":       ()      => invoke<number>("tasks_archive_done"),
+  "tasks:restore":           (id)    => invoke<void>("tasks_restore", { id }),
+  "tasks:listArchived":      ()      => invoke<Task[]>("tasks_list_archived"),
   "tasks:completionHistory": ()      => invoke<DayActivity[]>("tasks_completion_history"),
   "tasks:withDueDates":      ()      => invoke<Task[]>("tasks_with_due_dates"),
+
+  // ── Habits ──
+  "habits:create":           (p)     => {
+    const { name, icon, color, frequency, target_count, section, start_date, reminder_time, goal_type, notes } =
+      p as Record<string, unknown>
+    return invoke<any>("habits_create", {
+      name,
+      icon: icon ?? null,
+      color: color ?? null,
+      frequency: frequency ?? null,
+      targetCount: target_count ?? null,
+      section: section ?? null,
+      startDate: start_date ?? null,
+      reminderTime: reminder_time ?? null,
+      goalType: goal_type ?? null,
+      notes: notes ?? null,
+    })
+  },
+  "habits:list":             ()      => invoke<any[]>("habits_list"),
+  "habits:listArchived":     ()      => invoke<any[]>("habits_list_archived"),
+  "habits:update":           (p)     => {
+    const { id, name, icon, color, target_count, frequency, section, start_date, reminder_time, goal_type, sort_order, notes } =
+      p as Record<string, unknown>
+    return invoke<void>("habits_update", {
+      id,
+      name: name ?? null,
+      icon: icon ?? null,
+      color: color ?? null,
+      frequency: frequency ?? null,
+      targetCount: target_count ?? null,
+      section: section ?? null,
+      startDate: start_date ?? null,
+      reminderTime: reminder_time ?? null,
+      goalType: goal_type ?? null,
+      sortOrder: sort_order ?? null,
+      notes: notes ?? null,
+    })
+  },
+  "habits:archive":          (id)    => invoke<void>("habits_archive", { id }),
+  "habits:restore":          (id)    => invoke<void>("habits_restore", { id }),
+  "habits:delete":           (id)    => invoke<void>("habits_delete", { id }),
+  "habits:log":              (p)     => {
+    const { habit_id, date } = p as { habit_id: number; date: string }
+    return invoke<void>("habits_log", { habitId: habit_id, date })
+  },
+  "habits:unlog":            (p)     => {
+    const { habit_id, date } = p as { habit_id: number; date: string }
+    return invoke<void>("habits_unlog", { habitId: habit_id, date })
+  },
+  "habits:logsRange":        (p)     => {
+    const { habit_id, start_date, end_date } = p as { habit_id: number; start_date: string; end_date: string }
+    return invoke<any[]>("habits_logs_range", { habitId: habit_id, startDate: start_date, endDate: end_date })
+  },
+  "habits:allLogs":          (p)     => {
+    const { start_date, end_date, startDate, endDate } = p as Record<string, string>
+    return invoke<any[]>("habits_all_logs", { startDate: startDate ?? start_date, endDate: endDate ?? end_date })
+  },
+  "habits:streak":           (p)     => {
+    const { habit_id } = p as { habit_id: number }
+    return invoke<any>("habits_streak", { habitId: habit_id })
+  },
 
   // ── Pomodoro ──
   "pomodoro:start":          ()      => invoke<void>("pomodoro_start"),
@@ -123,7 +198,7 @@ const channelMap: Record<string, (payload?: unknown) => Promise<unknown>> = {
   "notes:createFolder":      (p)     => invoke<NoteEntry>("notes_create_folder", { payload: p }),
   "notes:update":            (p)     => invoke<NoteEntry | null>("notes_update", { payload: p }),
   "notes:delete":            (id)    => invoke<void>("notes_delete", { id }),
-  "notes:openFolder":        ()      => invoke<string>("notes_open_folder").then((path) => { open(path); }),
+  "notes:openFolder":        ()      => invoke<string>("notes_open_folder"),
   "notes:getRoot":           ()      => invoke<string>("notes_get_root"),
 
   // ── Timer Presets ──
@@ -150,6 +225,36 @@ const channelMap: Record<string, (payload?: unknown) => Promise<unknown>> = {
   // ── Updater ──
   "updater:check":              ()  => invoke<UpdateInfo>("updater_check"),
   "updater:downloadAndInstall": (p) => { const { download_url, installer_name } = p as { download_url: string; installer_name: string }; return invoke<void>("updater_download_and_install", { downloadUrl: download_url, installerName: installer_name }); },
+
+  // ── Spotify ──
+  "spotify:authStatus":   ()  => invoke<{ logged_in: boolean }>("spotify_auth_status"),
+  "spotify:getAccessToken": () => invoke<string>("spotify_get_access_token"),
+  "spotify:login":        ()  => invoke<void>("spotify_login"),
+  "spotify:logout":       ()  => invoke<void>("spotify_logout"),
+  "spotify:setActiveDevice": (p) => {
+    const { deviceId, play } = p as { deviceId: string; play?: boolean }
+    return invoke<void>("spotify_set_active_device", { deviceId, play: play ?? false })
+  },
+  "spotify:getPlayback":  ()  => invoke<unknown>("spotify_get_playback"),
+  "spotify:play":         ()  => invoke<void>("spotify_play"),
+  "spotify:pause":        ()  => invoke<void>("spotify_pause"),
+  "spotify:next":         ()  => invoke<void>("spotify_next"),
+  "spotify:previous":     ()  => invoke<void>("spotify_previous"),
+  "spotify:setVolume":    (v) => invoke<void>("spotify_set_volume", { volume: v as number }),
+  "spotify:setShuffle":   (p) => {
+    const { state } = p as { state: boolean }
+    return invoke<void>("spotify_set_shuffle", { state })
+  },
+  "spotify:setRepeat":    (p) => {
+    const { state } = p as { state: string }
+    return invoke<void>("spotify_set_repeat", { state })
+  },
+  "spotify:getDevices":   ()  => invoke<unknown[]>("spotify_get_devices"),
+  "spotify:getPlaylists": ()  => invoke<unknown[]>("spotify_get_playlists"),
+  "spotify:playPlaylist": (p) => {
+    const { playlistUri, deviceId } = p as { playlistUri: string; deviceId?: string | null }
+    return invoke<void>("spotify_play_playlist", { playlistUri, deviceId: deviceId ?? null })
+  },
 }
 
 // ── NoteEntry (used inside channelMap above) ─────────────────────────────────
@@ -182,6 +287,16 @@ const eventListenerFactories: Record<
 
   "updater:progress": (listener) =>
     listen<UpdaterProgress>("updater:progress", (event) => {
+      listener(event.payload)
+    }),
+
+  "spotify:auth-complete": (listener) =>
+    listen<void>("spotify:auth-complete", () => {
+      listener(undefined)
+    }),
+
+  "spotify:auth-error": (listener) =>
+    listen<string>("spotify:auth-error", (event) => {
       listener(event.payload)
     }),
 }

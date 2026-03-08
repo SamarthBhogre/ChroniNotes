@@ -3,7 +3,7 @@ import { useTasksStore } from "../store/tasks.store"
 import ActivityHeatmap from "../components/ActivityHeatmap"
 import CalendarMiniWidget from "../components/CalendarMiniWidget"
 
-type Page = "dashboard" | "tasks" | "notes" | "timer" | "calendar"
+type Page = "dashboard" | "tasks" | "notes" | "timer" | "calendar" | "habits" | "countdown"
 
 function useCardEntrance(_count: number) {
   const refs = useRef<(HTMLDivElement | null)[]>([])
@@ -23,10 +23,12 @@ function useCardEntrance(_count: number) {
 }
 
 const CARDS = [
-  { icon: "◈", label: "Tasks",    desc: "Todos & progress",      rgb: "99,102,241",  page: "tasks"    as Page },
-  { icon: "◉", label: "Notes",    desc: "Thoughts & writing",    rgb: "139,92,246",  page: "notes"    as Page },
-  { icon: "⊹", label: "Timer",    desc: "Pomodoro & focus",      rgb: "6,182,212",   page: "timer"    as Page },
-  { icon: "▦", label: "Calendar", desc: "Events & reminders",    rgb: "251,146,60",  page: "calendar" as Page },
+  { icon: "◈", label: "Tasks",     desc: "Todos & progress",      rgb: "99,102,241",  page: "tasks"     as Page },
+  { icon: "◉", label: "Notes",     desc: "Thoughts & writing",    rgb: "139,92,246",  page: "notes"     as Page },
+  { icon: "⊹", label: "Timer",     desc: "Pomodoro & focus",      rgb: "6,182,212",   page: "timer"     as Page },
+  { icon: "▦", label: "Calendar",  desc: "Events & reminders",    rgb: "251,146,60",  page: "calendar"  as Page },
+  { icon: "⟡", label: "Habits",    desc: "Daily tracking",        rgb: "52,211,153",  page: "habits"    as Page },
+  { icon: "⏳", label: "Countdown", desc: "Days until events",     rgb: "244,114,182", page: "countdown" as Page },
 ]
 
 interface Props { onNavigate?: (page: Page) => void }
@@ -160,7 +162,7 @@ export default function Dashboard({ onNavigate }: Props) {
         </div>
 
         {/* ── Row 1: Nav Cards (compact) ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", marginBottom: "12px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "10px", marginBottom: "12px" }}>
           {CARDS.map(({ icon, label, desc, rgb, page }, i) => (
             <div key={label} ref={el => { cardRefs.current[i] = el }} className="glass"
               onClick={() => onNavigate?.(page)}
@@ -287,12 +289,15 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </div>
 
-        {/* ── Row 3: Mini Calendar + Heatmap ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "10px" }}>
+        {/* ── Row 3: Countdown + Mini Calendar + Heatmap ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "200px 260px 1fr", gap: "10px" }}>
           <div ref={el => { cardRefs.current[6] = el }}>
-            <CalendarMiniWidget onNavigate={() => onNavigate?.("calendar")} />
+            <CountdownWidget onNavigate={() => onNavigate?.("countdown")} />
           </div>
           <div ref={el => { cardRefs.current[7] = el }}>
+            <CalendarMiniWidget onNavigate={() => onNavigate?.("calendar")} />
+          </div>
+          <div ref={el => { cardRefs.current[8] = el }}>
             <ActivityHeatmap
               history={activeHistory}
               weeks={20}
@@ -313,6 +318,80 @@ function MiniStat({ label, value, unit, accent }: { label: string; value: string
       <span style={{ fontSize: "12px", fontWeight: 700, color: accent ? "var(--accent)" : "var(--text-primary)" }}>
         {value} <span style={{ fontSize: "8px", fontWeight: 500, color: "var(--text-tertiary)" }}>{unit}</span>
       </span>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════
+   COUNTDOWN WIDGET (Dashboard mini version)
+══════════════════════════════════════ */
+type CountdownItem = { id: string; label: string; date: string; color: string; icon: string; notes?: string }
+
+function CountdownWidget({ onNavigate }: { onNavigate?: () => void }) {
+  const [items] = useState<CountdownItem[]>(() => {
+    try { return JSON.parse(localStorage.getItem("chorniNotes-countdowns-v2") || "[]") } catch { return [] }
+  })
+
+  const now = new Date()
+  const todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+
+  const upcoming = items
+    .map(it => {
+      const targetMs = new Date(it.date + "T00:00:00").getTime()
+      const daysLeft = Math.ceil((targetMs - todayMs) / 86400000)
+      return { ...it, daysLeft }
+    })
+    .filter(it => it.daysLeft >= 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 4)
+
+  return (
+    <div className="glass" style={{ borderRadius: "12px", padding: "14px 16px", height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <div>
+          <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "var(--text-tertiary)" }}>Countdown</div>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginTop: "1px" }}>Upcoming</div>
+        </div>
+        {onNavigate && (
+          <button onClick={onNavigate} style={{
+            padding: "3px 8px", borderRadius: "6px", fontSize: "9px", fontWeight: 600,
+            background: "var(--glass-bg)", border: "1px solid var(--glass-border)",
+            color: "var(--text-tertiary)", cursor: "pointer", transition: "all 0.12s",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.borderColor = "var(--accent-border)" }}
+            onMouseLeave={e => { e.currentTarget.style.color = "var(--text-tertiary)"; e.currentTarget.style.borderColor = "var(--glass-border)" }}
+          >View all →</button>
+        )}
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px", overflowY: "auto" }}>
+        {upcoming.length === 0 ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "var(--text-tertiary)", opacity: 0.5 }}>
+            No upcoming events
+          </div>
+        ) : upcoming.map(item => (
+          <div key={item.id} style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "6px 8px", borderRadius: "8px",
+            background: item.daysLeft === 0 ? "var(--accent-dim)" : "var(--glass-bg)",
+            border: `1px solid ${item.daysLeft === 0 ? "var(--accent-border)" : "var(--glass-border)"}`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+              <span style={{ fontSize: "12px", flexShrink: 0 }}>{item.icon}</span>
+              <span style={{
+                fontSize: "11px", fontWeight: 600, color: "var(--text-primary)",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>{item.label}</span>
+            </div>
+            <span style={{
+              fontSize: "12px", fontWeight: 700, flexShrink: 0, marginLeft: "6px",
+              color: item.daysLeft === 0 ? "var(--accent)" : item.daysLeft <= 3 ? item.color : "var(--text-primary)",
+            }}>
+              {item.daysLeft === 0 ? "Today!" : `${item.daysLeft}d`}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

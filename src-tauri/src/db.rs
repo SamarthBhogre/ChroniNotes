@@ -35,7 +35,9 @@ impl Database {
         // second connection can proceed while a write holds the lock.
 
         let db = Database {
-            inner: Arc::new(DatabaseInner { conn: Mutex::new(conn) }),
+            inner: Arc::new(DatabaseInner {
+                conn: Mutex::new(conn),
+            }),
         };
         db.create_schema();
         db.run_migrations();
@@ -48,14 +50,26 @@ impl Database {
     }
 
     fn create_schema(&self) {
-        let conn = self.conn().lock().expect("DB mutex poisoned in create_schema");
+        let conn = self
+            .conn()
+            .lock()
+            .expect("DB mutex poisoned in create_schema");
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS tasks (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 title        TEXT    NOT NULL CHECK(length(trim(title)) > 0),
                 status       TEXT    NOT NULL DEFAULT 'todo'
                                      CHECK(status IN ('todo','in-progress','done')),
-                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME DEFAULT NULL,
+                due_date     TEXT     DEFAULT NULL,
+                parent_id    INTEGER DEFAULT NULL,
+                sort_order   INTEGER DEFAULT 0,
+                priority     TEXT    DEFAULT NULL
+                                     CHECK(priority IS NULL OR priority IN ('urgent-important','important','urgent','neither')),
+                description  TEXT    DEFAULT NULL,
+                archived     INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1)),
+                FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
              );
 
              CREATE TABLE IF NOT EXISTS pomodoro_settings (
@@ -98,32 +112,86 @@ impl Database {
              );
 
              INSERT OR IGNORE INTO pomodoro_settings (id, work_minutes, break_minutes)
-             VALUES (1, 25, 5);",
+             VALUES (1, 25, 5);
+
+             CREATE TABLE IF NOT EXISTS habits (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                name         TEXT    NOT NULL CHECK(length(trim(name)) > 0),
+                icon         TEXT    NOT NULL DEFAULT '✦',
+                color        TEXT    NOT NULL DEFAULT '#818cf8',
+                frequency    TEXT    NOT NULL DEFAULT 'daily'
+                                     CHECK(frequency IN ('daily','weekly')),
+                target_count INTEGER NOT NULL DEFAULT 1 CHECK(target_count >= 1),
+                archived     INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1)),
+                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+             );
+
+             CREATE TABLE IF NOT EXISTS habit_logs (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                habit_id  INTEGER NOT NULL,
+                date      TEXT    NOT NULL
+                                  CHECK(date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+                count     INTEGER NOT NULL DEFAULT 1 CHECK(count >= 1),
+                FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE,
+                UNIQUE(habit_id, date)
+             );",
         )
         .expect("Failed to create schema");
     }
 
     fn run_migrations(&self) {
-        let conn = self.conn().lock().expect("DB mutex poisoned in run_migrations");
+        let conn = self
+            .conn()
+            .lock()
+            .expect("DB mutex poisoned in run_migrations");
 
         // ── tasks: column additions ──────────────────────────────────────────
-        let task_cols = table_columns(&conn, "tasks")
-            .expect("Failed to read tasks columns");
+        let task_cols = table_columns(&conn, "tasks").expect("Failed to read tasks columns");
 
         if !task_cols.contains(&"completed_at".to_string()) {
-            conn.execute_batch(
-                "ALTER TABLE tasks ADD COLUMN completed_at DATETIME DEFAULT NULL;",
-            )
-            .expect("Migration failed: tasks.completed_at");
+            conn.execute_batch("ALTER TABLE tasks ADD COLUMN completed_at DATETIME DEFAULT NULL;")
+                .expect("Migration failed: tasks.completed_at");
             log::info!("[DB] Migration: added completed_at to tasks");
         }
 
         if !task_cols.contains(&"due_date".to_string()) {
-            conn.execute_batch(
-                "ALTER TABLE tasks ADD COLUMN due_date TEXT DEFAULT NULL;",
-            )
-            .expect("Migration failed: tasks.due_date");
+            conn.execute_batch("ALTER TABLE tasks ADD COLUMN due_date TEXT DEFAULT NULL;")
+                .expect("Migration failed: tasks.due_date");
             log::info!("[DB] Migration: added due_date to tasks");
+        }
+
+        if !task_cols.contains(&"parent_id".to_string()) {
+            conn.execute_batch("ALTER TABLE tasks ADD COLUMN parent_id INTEGER DEFAULT NULL;")
+                .expect("Migration failed: tasks.parent_id");
+            log::info!("[DB] Migration: added parent_id to tasks");
+        }
+
+        if !task_cols.contains(&"sort_order".to_string()) {
+            conn.execute_batch("ALTER TABLE tasks ADD COLUMN sort_order INTEGER DEFAULT 0;")
+                .expect("Migration failed: tasks.sort_order");
+            log::info!("[DB] Migration: added sort_order to tasks");
+        }
+
+        if !task_cols.contains(&"priority".to_string()) {
+            conn.execute_batch(
+                "ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT NULL;",
+            )
+            .expect("Migration failed: tasks.priority");
+            log::info!("[DB] Migration: added priority to tasks");
+        }
+
+        if !task_cols.contains(&"description".to_string()) {
+            conn.execute_batch("ALTER TABLE tasks ADD COLUMN description TEXT DEFAULT NULL;")
+                .expect("Migration failed: tasks.description");
+            log::info!("[DB] Migration: added description to tasks");
+        }
+
+        if !task_cols.contains(&"archived".to_string()) {
+            conn.execute_batch(
+                "ALTER TABLE tasks ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;",
+            )
+            .expect("Migration failed: tasks.archived");
+            log::info!("[DB] Migration: added archived to tasks");
         }
 
         // ── calendar_events: column additions ────────────────────────────────
@@ -165,6 +233,47 @@ impl Database {
         rebuild_table_with_checks(&conn, "tasks").expect("Migration failed: tasks rebuild");
         rebuild_table_with_checks(&conn, "calendar_events")
             .expect("Migration failed: calendar_events rebuild");
+
+        // ── habits: column additions ─────────────────────────────────────────
+        let habit_cols = table_columns(&conn, "habits").expect("Failed to read habits columns");
+
+        if !habit_cols.contains(&"section".to_string()) {
+            conn.execute_batch("ALTER TABLE habits ADD COLUMN section TEXT DEFAULT NULL;")
+                .expect("Migration failed: habits.section");
+            log::info!("[DB] Migration: added section to habits");
+        }
+
+        if !habit_cols.contains(&"start_date".to_string()) {
+            conn.execute_batch("ALTER TABLE habits ADD COLUMN start_date TEXT DEFAULT NULL;")
+                .expect("Migration failed: habits.start_date");
+            log::info!("[DB] Migration: added start_date to habits");
+        }
+
+        if !habit_cols.contains(&"reminder_time".to_string()) {
+            conn.execute_batch("ALTER TABLE habits ADD COLUMN reminder_time TEXT DEFAULT NULL;")
+                .expect("Migration failed: habits.reminder_time");
+            log::info!("[DB] Migration: added reminder_time to habits");
+        }
+
+        if !habit_cols.contains(&"goal_type".to_string()) {
+            conn.execute_batch(
+                "ALTER TABLE habits ADD COLUMN goal_type TEXT NOT NULL DEFAULT 'at_least';",
+            )
+            .expect("Migration failed: habits.goal_type");
+            log::info!("[DB] Migration: added goal_type to habits");
+        }
+
+        if !habit_cols.contains(&"sort_order".to_string()) {
+            conn.execute_batch("ALTER TABLE habits ADD COLUMN sort_order INTEGER DEFAULT 0;")
+                .expect("Migration failed: habits.sort_order");
+            log::info!("[DB] Migration: added sort_order to habits");
+        }
+
+        if !habit_cols.contains(&"notes".to_string()) {
+            conn.execute_batch("ALTER TABLE habits ADD COLUMN notes TEXT DEFAULT NULL;")
+                .expect("Migration failed: habits.notes");
+            log::info!("[DB] Migration: added notes to habits");
+        }
     }
 }
 
@@ -188,12 +297,13 @@ fn table_columns(conn: &Connection, table: &str) -> rusqlite::Result<Vec<String>
 /// Returns `Ok(false)` if the table does not exist (so the rebuild path
 /// gracefully handles unknown tables rather than panicking).
 fn table_has_check_constraints(conn: &Connection, table: &str) -> rusqlite::Result<bool> {
-    let ddl: Option<String> = conn.query_row(
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
-        rusqlite::params![table],
-        |row| row.get(0),
-    )
-    .optional()?;
+    let ddl: Option<String> = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            rusqlite::params![table],
+            |row| row.get(0),
+        )
+        .optional()?;
 
     match ddl {
         None => Ok(false),
@@ -217,10 +327,7 @@ fn table_has_check_constraints(conn: &Connection, table: &str) -> rusqlite::Resu
 /// This function must only be called with table names that are also created by
 /// `create_schema()`.  After this call the live table has the same schema as
 /// `create_schema()` produces.
-fn rebuild_table_with_checks(
-    conn: &Connection,
-    table: &str,
-) -> rusqlite::Result<()> {
+fn rebuild_table_with_checks(conn: &Connection, table: &str) -> rusqlite::Result<()> {
     if table_has_check_constraints(conn, table)? {
         return Ok(()); // already up to date
     }
@@ -238,9 +345,16 @@ fn rebuild_table_with_checks(
                                      CHECK(status IN ('todo','in-progress','done')),
                 created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
                 completed_at DATETIME DEFAULT NULL,
-                due_date     TEXT     DEFAULT NULL
+                due_date     TEXT     DEFAULT NULL,
+                parent_id    INTEGER DEFAULT NULL,
+                sort_order   INTEGER DEFAULT 0,
+                priority     TEXT    DEFAULT NULL
+                                     CHECK(priority IS NULL OR priority IN ('urgent-important','important','urgent','neither')),
+                description  TEXT    DEFAULT NULL,
+                archived     INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1)),
+                FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
              )",
-            "id, title, status, created_at, completed_at, due_date",
+            "id, title, status, created_at, completed_at, due_date, parent_id, sort_order, priority, description, archived",
         ),
         "calendar_events" => (
             "CREATE TABLE calendar_events (
@@ -283,11 +397,7 @@ fn rebuild_table_with_checks(
     ))?;
 
     // Log how many rows were actually copied vs. were originally present.
-    let orig: i64 = conn.query_row(
-        &format!("SELECT COUNT(*) FROM {table}"),
-        [],
-        |r| r.get(0),
-    )?;
+    let orig: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))?;
     // Note: if orig == expected then nothing was skipped.
     log::info!("[DB] '{table}' rebuild complete — {orig} row(s) retained after CHECK migration");
 
@@ -305,7 +415,7 @@ pub mod tests {
     /// Open a fresh in-memory-like DB in a temp directory.
     pub fn test_db() -> (TempDir, Database) {
         let dir = TempDir::new().unwrap();
-        let db  = Database::new(&PathBuf::from(dir.path()));
+        let db = Database::new(&PathBuf::from(dir.path()));
         (dir, db)
     }
 
@@ -327,13 +437,33 @@ pub mod tests {
         let conn = db.conn().lock().unwrap();
 
         let task_cols = table_columns(&conn, "tasks").unwrap();
-        for col in &["id","title","status","created_at","completed_at","due_date"] {
-            assert!(task_cols.contains(&col.to_string()), "tasks missing column: {col}");
+        for col in &[
+            "id",
+            "title",
+            "status",
+            "created_at",
+            "completed_at",
+            "due_date",
+        ] {
+            assert!(
+                task_cols.contains(&col.to_string()),
+                "tasks missing column: {col}"
+            );
         }
 
         let cal_cols = table_columns(&conn, "calendar_events").unwrap();
-        for col in &["id","title","type","date","reminder_minutes","notified"] {
-            assert!(cal_cols.contains(&col.to_string()), "calendar_events missing column: {col}");
+        for col in &[
+            "id",
+            "title",
+            "type",
+            "date",
+            "reminder_minutes",
+            "notified",
+        ] {
+            assert!(
+                cal_cols.contains(&col.to_string()),
+                "calendar_events missing column: {col}"
+            );
         }
     }
 
@@ -342,11 +472,13 @@ pub mod tests {
     fn default_pomodoro_settings_seeded() {
         let (_dir, db) = test_db();
         let conn = db.conn().lock().unwrap();
-        let (w, b): (i64, i64) = conn.query_row(
-            "SELECT work_minutes, break_minutes FROM pomodoro_settings WHERE id = 1",
-            [],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        ).unwrap();
+        let (w, b): (i64, i64) = conn
+            .query_row(
+                "SELECT work_minutes, break_minutes FROM pomodoro_settings WHERE id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
         assert_eq!(w, 25);
         assert_eq!(b, 5);
     }
@@ -361,7 +493,7 @@ pub mod tests {
     ///   c) inserting a row that violates a constraint is now rejected
     #[test]
     fn legacy_tasks_schema_gets_rebuilt_with_checks() {
-        let dir  = TempDir::new().unwrap();
+        let dir = TempDir::new().unwrap();
         let path = PathBuf::from(dir.path());
 
         // ── phase 1: create legacy DB (no CHECKs) ──────────────────────────
@@ -416,7 +548,8 @@ pub mod tests {
                      notified INTEGER DEFAULT 0,
                      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                  );",
-            ).unwrap();
+            )
+            .unwrap();
         }
 
         // ── phase 2: open via Database::new (runs migrations) ──────────────
@@ -432,19 +565,23 @@ pub mod tests {
         );
 
         // Valid row survived.
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM tasks WHERE title = 'Valid task'",
-            [],
-            |r| r.get(0),
-        ).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tasks WHERE title = 'Valid task'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1, "valid row must survive the rebuild");
 
         // Invalid row was dropped.
-        let bad_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM tasks WHERE status = 'INVALID_STATUS'",
-            [],
-            |r| r.get(0),
-        ).unwrap();
+        let bad_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tasks WHERE status = 'INVALID_STATUS'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(bad_count, 0, "invalid row must be dropped during rebuild");
 
         // New inserts are now constrained.
@@ -452,7 +589,10 @@ pub mod tests {
             "INSERT INTO tasks (title, status) VALUES ('New bad', 'INVALID')",
             [],
         );
-        assert!(result.is_err(), "CHECK constraint must reject new invalid status");
+        assert!(
+            result.is_err(),
+            "CHECK constraint must reject new invalid status"
+        );
     }
 
     /// A fresh DB (created by `create_schema`) must be detected as already
@@ -517,7 +657,7 @@ pub mod tests {
 
         // The columns listed in rebuild_table_with_checks for "tasks".
         // If you add a column to create_schema, add it here too.
-        let rebuild_cols: Vec<&str> = "id, title, status, created_at, completed_at, due_date"
+        let rebuild_cols: Vec<&str> = "id, title, status, created_at, completed_at, due_date, parent_id, sort_order, priority, description, archived"
             .split(',')
             .map(|s| s.trim())
             .collect();

@@ -5,6 +5,10 @@ It unifies tasks, notes, and timer workflows in one local-first workspace.
 
 Your data stays on your machine.
 
+## Privacy Policy
+
+ChroniNotes privacy policy: [PRIVACY_POLICY.md](./PRIVACY_POLICY.md)
+
 ## Why This Project
 
 Most productivity tools split notes, tasks, and focus timers into separate apps.
