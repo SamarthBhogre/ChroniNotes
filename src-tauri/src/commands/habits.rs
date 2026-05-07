@@ -450,11 +450,11 @@ pub fn habits_streak(habit_id: i64, db: State<Database>) -> Result<HabitStreak, 
     let conn = db.conn().lock().map_err(|e| e.to_string())?;
 
     // Get habit info for target
-    let (target_count, goal_type): (i64, String) = conn
+    let (target_count, goal_type, start_date): (i64, String, Option<String>) = conn
         .query_row(
-            "SELECT target_count, COALESCE(goal_type, 'at_least') FROM habits WHERE id = ?1",
+            "SELECT target_count, COALESCE(goal_type, 'at_least'), start_date FROM habits WHERE id = ?1",
             params![habit_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .map_err(|e| format!("Habit {} not found: {}", habit_id, e))?;
 
@@ -473,7 +473,7 @@ pub fn habits_streak(habit_id: i64, db: State<Database>) -> Result<HabitStreak, 
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
-    if logs.is_empty() {
+    if logs.is_empty() && start_date.is_none() {
         return Ok(HabitStreak {
             habit_id,
             current_streak: 0,
@@ -497,21 +497,32 @@ pub fn habits_streak(habit_id: i64, db: State<Database>) -> Result<HabitStreak, 
         date_map.insert(date.clone(), *count);
     }
 
-    // Count total completions
-    let total_completions = logs.iter().filter(|(_, c)| is_completed(*c)).count() as i64;
+    // Determine the finite date range that the streak is allowed to inspect.
+    let today_date = chrono::Local::now().date_naive();
+    let today = today_date.format("%Y-%m-%d").to_string();
+    let earliest = logs.last().map(|(d, _)| d.clone());
+    let latest = logs.first().map(|(d, _)| d.clone()).unwrap_or_else(|| today.clone());
+    let tracking_start = start_date
+        .as_deref()
+        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+        .or_else(|| {
+            earliest
+                .as_deref()
+                .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+        })
+        .unwrap_or(today_date);
 
-    // Current streak: walk backwards from today
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    // Current streak: walk backwards from today, bounded by the habit's tracked range.
     let mut current_streak: i64 = 0;
-    let mut check_date = chrono::Local::now().date_naive();
+    let mut check_date = today_date;
 
-    loop {
+    while check_date >= tracking_start {
         let ds = check_date.format("%Y-%m-%d").to_string();
         let count = date_map.get(&ds).copied().unwrap_or(0);
         if is_completed(count) {
             current_streak += 1;
             check_date -= chrono::Duration::days(1);
-        } else if ds == today {
+        } else if ds == today && goal_type != "at_most" {
             // Today might not be completed yet — check yesterday
             check_date -= chrono::Duration::days(1);
         } else {
@@ -519,47 +530,36 @@ pub fn habits_streak(habit_id: i64, db: State<Database>) -> Result<HabitStreak, 
         }
     }
 
-    // Best streak: walk through all dates from earliest to latest
-    let earliest = logs.last().map(|(d, _)| d.clone()).unwrap_or_default();
-    let latest = logs.first().map(|(d, _)| d.clone()).unwrap_or_default();
-
+    // Best streak and total completions: walk through the tracked date range.
     let mut best_streak: i64 = 0;
     let mut running: i64 = 0;
+    let mut total_completions: i64 = 0;
 
-    if let (Ok(start), Ok(end)) = (
-        chrono::NaiveDate::parse_from_str(&earliest, "%Y-%m-%d"),
-        chrono::NaiveDate::parse_from_str(&latest, "%Y-%m-%d"),
-    ) {
-        let mut d = start;
-        while d <= end {
-            let ds = d.format("%Y-%m-%d").to_string();
-            let count = date_map.get(&ds).copied().unwrap_or(0);
-            if is_completed(count) {
-                running += 1;
-                if running > best_streak {
-                    best_streak = running;
-                }
-            } else {
-                running = 0;
+    let end_for_best = chrono::NaiveDate::parse_from_str(&latest, "%Y-%m-%d")
+        .unwrap_or(today_date)
+        .max(today_date);
+    let mut d = tracking_start;
+    while d <= end_for_best {
+        let ds = d.format("%Y-%m-%d").to_string();
+        let count = date_map.get(&ds).copied().unwrap_or(0);
+        if is_completed(count) {
+            total_completions += 1;
+            running += 1;
+            if running > best_streak {
+                best_streak = running;
             }
-            d += chrono::Duration::days(1);
+        } else {
+            running = 0;
         }
+        d += chrono::Duration::days(1);
     }
 
     if current_streak > best_streak {
         best_streak = current_streak;
     }
 
-    // Completion rate: total_completions / total days tracked
-    let total_days = if let (Ok(start), Ok(_end)) = (
-        chrono::NaiveDate::parse_from_str(&earliest, "%Y-%m-%d"),
-        chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d"),
-    ) {
-        let end_date = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d").unwrap();
-        (end_date - start).num_days().max(1)
-    } else {
-        1
-    };
+    // Completion rate: total completions / total days tracked, inclusive of today.
+    let total_days = (today_date - tracking_start).num_days().max(0) + 1;
     let completion_rate = total_completions as f64 / total_days as f64;
 
     Ok(HabitStreak {

@@ -30,6 +30,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function isNoListLoadedMessage(message: string): boolean {
+  return message.toLowerCase().includes("no list was loaded")
+}
+
 // ── SVG Icons ────────────────────────────────────────────────────────────────
 
 const SpotifyLogo = (
@@ -233,11 +237,10 @@ export default function SpotifyPlayer() {
           const { device_id } = payload as SpotifyWebPlaybackReady
           sdkDeviceIdRef.current = device_id
           setSdkReady(true)
-          window.electron.invoke("spotify:setActiveDevice", { deviceId: device_id, play: false })
-            .then(() => fetchPlayback())
-            .catch((e) => {
-              useSpotifyStore.setState({ error: String(e) })
-            })
+          // Do not force-transfer on ready. This avoids putting users into an
+          // empty SDK queue state when they're currently listening on another
+          // Spotify device.
+          void fetchPlayback()
         })
 
         player.addListener("not_ready", (payload) => {
@@ -272,8 +275,13 @@ export default function SpotifyPlayer() {
           const looksTransientTokenError =
             msg.toLowerCase().includes("invalid token") ||
             msg.toLowerCase().includes("token expired")
+          const noListLoaded = isNoListLoadedMessage(msg)
 
           if (looksTransientTokenError && Date.now() < suppressTransientAuthErrorUntilRef.current) {
+            return
+          }
+          if (noListLoaded) {
+            useSpotifyStore.setState({ error: "No in-app queue yet. Start playback from Playlists first." })
             return
           }
           useSpotifyStore.setState({ error: `Spotify SDK: ${err.message}` })
@@ -333,25 +341,41 @@ export default function SpotifyPlayer() {
   }
 
   const handlePrevious = async () => {
-    await ensureSdkDeviceActive()
     const player = sdkPlayerRef.current
     if (player) {
-      await player.previousTrack()
-      await sleep(250)
-      await syncTrackFromSdk()
-      return
+      try {
+        const state = await player.getCurrentState()
+        if (state) {
+          await ensureSdkDeviceActive()
+          await player.previousTrack()
+          await sleep(250)
+          await syncTrackFromSdk()
+          return
+        }
+      } catch (e) {
+        const msg = String(e)
+        if (!isNoListLoadedMessage(msg)) throw e
+      }
     }
     await apiPrevious()
   }
 
   const handlePlayPause = async () => {
-    await ensureSdkDeviceActive()
     const player = sdkPlayerRef.current
     if (player) {
-      await player.togglePlay()
-      await sleep(150)
-      await syncTrackFromSdk()
-      return
+      try {
+        const state = await player.getCurrentState()
+        if (state) {
+          await ensureSdkDeviceActive()
+          await player.togglePlay()
+          await sleep(150)
+          await syncTrackFromSdk()
+          return
+        }
+      } catch (e) {
+        const msg = String(e)
+        if (!isNoListLoadedMessage(msg)) throw e
+      }
     }
     if (track?.is_playing) {
       await apiPause()
@@ -361,13 +385,21 @@ export default function SpotifyPlayer() {
   }
 
   const handleNext = async () => {
-    await ensureSdkDeviceActive()
     const player = sdkPlayerRef.current
     if (player) {
-      await player.nextTrack()
-      await sleep(250)
-      await syncTrackFromSdk()
-      return
+      try {
+        const state = await player.getCurrentState()
+        if (state) {
+          await ensureSdkDeviceActive()
+          await player.nextTrack()
+          await sleep(250)
+          await syncTrackFromSdk()
+          return
+        }
+      } catch (e) {
+        const msg = String(e)
+        if (!isNoListLoadedMessage(msg)) throw e
+      }
     }
     await apiNext()
   }

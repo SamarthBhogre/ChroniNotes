@@ -11,7 +11,6 @@ interface AboutProps {
  * tauri.conf.json and Cargo.toml.
  */
 const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "3.0.0"
-const BUILD_YEAR  = "2026"
 
 /* ── All keyboard shortcuts / commands ── */
 const SHORTCUT_SECTIONS = [
@@ -255,7 +254,7 @@ export default function About({ onClose }: AboutProps) {
                 ))}
               </div>
 
-              {/* Credits */}
+              {/* Temp hide developer detail
               <div style={{
                 padding: "14px 18px", borderRadius: "12px",
                 background: "var(--accent-dim)", border: "1px solid var(--accent-border)",
@@ -266,6 +265,7 @@ export default function About({ onClose }: AboutProps) {
                   Software Developer · © {BUILD_YEAR}
                 </div>
               </div>
+              */}
 
               {/* Footer info */}
               <div style={{

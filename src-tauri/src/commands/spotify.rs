@@ -95,6 +95,17 @@ struct StoredTokens {
     expires_at: i64,
 }
 
+#[derive(Debug, Deserialize)]
+struct SpotifyApiErrorEnvelope {
+    error: SpotifyApiErrorBody,
+}
+
+#[derive(Debug, Deserialize)]
+struct SpotifyApiErrorBody {
+    message: Option<String>,
+    reason: Option<String>,
+}
+
 fn load_tokens(db: &Database) -> Option<StoredTokens> {
     let conn = db.conn().lock().ok()?;
     conn.query_row(
@@ -233,12 +244,51 @@ async fn spotify_api_get(db: &Database, path: &str) -> Result<serde_json::Value,
     if !resp.status().is_success() {
         let status = resp.status().as_u16();
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("Spotify API error {status}: {body}"));
+        return Err(format_spotify_http_error("Spotify API error", status, &body));
     }
 
     resp.json()
         .await
         .map_err(|e| format!("Failed to parse Spotify response: {e}"))
+}
+
+fn format_spotify_http_error(prefix: &str, status: u16, body: &str) -> String {
+    if let Ok(parsed) = serde_json::from_str::<SpotifyApiErrorEnvelope>(body) {
+        let message = parsed
+            .error
+            .message
+            .unwrap_or_else(|| "Unknown Spotify error".to_string());
+        let reason = parsed.error.reason.unwrap_or_default();
+        let reason_upper = reason.to_ascii_uppercase();
+
+        if reason_upper == "PREMIUM_REQUIRED" {
+            return format!(
+                "{prefix} {status}: Spotify Premium is required for this playback action."
+            );
+        }
+        if reason_upper == "NO_ACTIVE_DEVICE" {
+            return format!(
+                "{prefix} {status}: No active Spotify device found. Open Spotify and start playback once."
+            );
+        }
+        if status == 403 {
+            return format!(
+                "{prefix} {status}: Spotify denied this action for the current account/device ({message})."
+            );
+        }
+
+        if reason.is_empty() {
+            return format!("{prefix} {status}: {message}");
+        }
+        return format!("{prefix} {status}: {message} ({reason})");
+    }
+
+    if status == 403 {
+        return format!(
+            "{prefix} {status}: Spotify denied this action for the current account/device."
+        );
+    }
+    format!("{prefix} {status}: {body}")
 }
 
 fn is_no_active_device_error(status: u16, body: &str) -> bool {
@@ -351,11 +401,17 @@ async fn spotify_api_put(
             }
             let retry_status = retry.status().as_u16();
             let retry_body = retry.text().await.unwrap_or_default();
-            return Err(format!(
-                "Spotify API PUT error {retry_status}: {retry_body}"
+            return Err(format_spotify_http_error(
+                "Spotify API PUT error",
+                retry_status,
+                &retry_body,
             ));
         }
-        return Err(format!("Spotify API PUT error {status}: {error_body}"));
+        return Err(format_spotify_http_error(
+            "Spotify API PUT error",
+            status,
+            &error_body,
+        ));
     }
     Ok(())
 }
@@ -395,11 +451,17 @@ async fn spotify_api_post(db: &Database, path: &str) -> Result<(), String> {
             }
             let retry_status = retry.status().as_u16();
             let retry_body = retry.text().await.unwrap_or_default();
-            return Err(format!(
-                "Spotify API POST error {retry_status}: {retry_body}"
+            return Err(format_spotify_http_error(
+                "Spotify API POST error",
+                retry_status,
+                &retry_body,
             ));
         }
-        return Err(format!("Spotify API POST error {status}: {body}"));
+        return Err(format_spotify_http_error(
+            "Spotify API POST error",
+            status,
+            &body,
+        ));
     }
     Ok(())
 }
@@ -454,7 +516,11 @@ pub async fn spotify_set_active_device(
     if !resp.status().is_success() {
         let status = resp.status().as_u16();
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("Spotify set active device error {status}: {body}"));
+        return Err(format_spotify_http_error(
+            "Spotify set active device error",
+            status,
+            &body,
+        ));
     }
 
     Ok(())

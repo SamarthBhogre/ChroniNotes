@@ -4,11 +4,29 @@ export type UserStatus = "learning" | "working" | "idle"
 
 export const STATUS_CONFIG: Record<
   UserStatus,
-  { label: string; color: string; glow: string }
+  { label: string; color: string; glow: string; wash: string; border: string }
 > = {
-  learning: { label: "Learning", color: "#34d399", glow: "0 0 6px #34d399" },
-  working:  { label: "Working",  color: "#f87171", glow: "0 0 6px #f87171" },
-  idle:     { label: "Idle",     color: "#fbbf24", glow: "0 0 6px #fbbf24" },
+  learning: {
+    label: "Learning",
+    color: "#38bdf8",
+    glow: "0 0 6px #38bdf8",
+    wash: "rgba(56, 189, 248, 0.12)",
+    border: "rgba(56, 189, 248, 0.26)",
+  },
+  working: {
+    label: "Working",
+    color: "#34d399",
+    glow: "0 0 6px #34d399",
+    wash: "rgba(52, 211, 153, 0.12)",
+    border: "rgba(52, 211, 153, 0.26)",
+  },
+  idle: {
+    label: "Idle",
+    color: "#94a3b8",
+    glow: "0 0 6px #94a3b8",
+    wash: "rgba(148, 163, 184, 0.12)",
+    border: "rgba(148, 163, 184, 0.24)",
+  },
 }
 
 type UserStore = {

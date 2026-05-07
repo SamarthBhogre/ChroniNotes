@@ -1,11 +1,10 @@
-import { useRef, useState, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react"
 import {
-  useUserStore,
   STATUS_CONFIG,
+  useUserStore,
   type UserStatus,
 } from "../../store/user.store"
 
-/* ── Resize an image file to a square, "cover" style (no distortion) ── */
 function resizeImage(file: File, maxSize = 256): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -17,14 +16,15 @@ function resizeImage(file: File, maxSize = 256): Promise<string> {
         const canvas = document.createElement("canvas")
         canvas.width = maxSize
         canvas.height = maxSize
-        const ctx = canvas.getContext("2d")!
+        const ctx = canvas.getContext("2d")
+        if (!ctx) {
+          reject(new Error("Could not create image canvas"))
+          return
+        }
 
-        // "cover" — crop the shortest side, center the longer side
         const cropSide = Math.min(img.width, img.height)
         const sx = (img.width - cropSide) / 2
         const sy = (img.height - cropSide) / 2
-
-        // Draw the center-cropped square scaled into the canvas
         ctx.drawImage(img, sx, sy, cropSide, cropSide, 0, 0, maxSize, maxSize)
 
         resolve(canvas.toDataURL("image/jpeg", 0.9))
@@ -35,6 +35,96 @@ function resizeImage(file: File, maxSize = 256): Promise<string> {
   })
 }
 
+function Avatar({
+  avatar,
+  name,
+  status,
+  size,
+  onClick,
+}: {
+  avatar: string | null
+  name: string
+  status: UserStatus
+  size: number
+  onClick?: () => void
+}) {
+  const cfg = STATUS_CONFIG[status]
+  const initial = (name.trim()[0] || "U").toUpperCase()
+
+  return (
+    <span
+      onClick={onClick}
+      onKeyDown={e => {
+        if (!onClick) return
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      title={onClick ? "Change photo" : undefined}
+      style={{
+        display: "block",
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        flexShrink: 0,
+        position: "relative",
+        padding: 0,
+        cursor: onClick ? "pointer" : "default",
+        background: "var(--glass-bg)",
+        border: "1px solid var(--glass-border-strong)",
+      }}
+    >
+      {avatar ? (
+        <img
+          src={avatar}
+          alt="Profile"
+          style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      ) : (
+        <span
+          style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--text-primary)",
+            background:
+              "linear-gradient(135deg, var(--glass-bg-hover), var(--bg-surface))",
+            fontSize: size >= 56 ? "22px" : "13px",
+            fontWeight: 700,
+          }}
+        >
+          {initial}
+        </span>
+      )}
+      <span
+        style={{
+          position: "absolute",
+          right: size >= 56 ? 2 : 0,
+          bottom: size >= 56 ? 2 : 0,
+          width: size >= 56 ? 13 : 10,
+          height: size >= 56 ? 13 : 10,
+          borderRadius: "50%",
+          background: cfg.color,
+          border: "2px solid var(--bg-surface)",
+          boxShadow: `0 0 0 3px ${cfg.wash}`,
+        }}
+      />
+    </span>
+  )
+}
+
 export default function UserProfileCard({ collapsed = false }: { collapsed?: boolean }) {
   const { name, avatar, status, setName, setAvatar, setStatus, hydrate } =
     useUserStore()
@@ -42,40 +132,29 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
   const fileRef = useRef<HTMLInputElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
 
-  const [editing, setEditing] = useState(false)
-  const [, setShowStatusMenu] = useState(false)
   const [showProfilePopup, setShowProfilePopup] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [draftName, setDraftName] = useState(name)
 
-  // Hydrate from localStorage on mount
   useEffect(() => { hydrate() }, [])
-  // Sync draft when store changes
   useEffect(() => { setDraftName(name) }, [name])
 
-  /* ── Avatar picker ── */
-  const handleAvatarClick = () => fileRef.current?.click()
-
   const handleFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
-      if (!file) return
-      if (!file.type.startsWith("image/")) return
+      if (!file || !file.type.startsWith("image/")) return
+
       try {
-        const dataUrl = await resizeImage(file)
-        setAvatar(dataUrl)
+        setAvatar(await resizeImage(file))
       } catch {
         console.error("Failed to process avatar image")
+      } finally {
+        e.target.value = ""
       }
-      e.target.value = "" // reset so same file can be re-selected
     },
     [setAvatar]
   )
 
-  /* ── Name editing ── */
-  const startEditing = () => {
-    setEditing(true)
-    setTimeout(() => nameRef.current?.focus(), 50)
-  }
   const commitName = () => {
     setName(draftName)
     setEditing(false)
@@ -85,7 +164,6 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
 
   return (
     <>
-      {/* Hidden file input */}
       <input
         ref={fileRef}
         type="file"
@@ -94,151 +172,111 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
         onChange={handleFileChange}
       />
 
-      {/* ── Card ── */}
-      <div
-        className={collapsed ? "" : "px-4 py-4 mx-3 mb-4 rounded-xl flex items-center gap-3"}
+      <button
+        onClick={() => setShowProfilePopup(v => !v)}
         style={{
-          background: collapsed ? "transparent" : "var(--glass-bg)",
-          border: collapsed ? "none" : "1px solid var(--glass-border)",
+          margin: collapsed ? "8px auto 12px" : "10px 12px 14px",
+          width: collapsed ? 42 : "calc(100% - 24px)",
+          minHeight: collapsed ? 42 : 58,
+          padding: collapsed ? 0 : "10px 12px",
+          borderRadius: "10px",
+          background: showProfilePopup ? "var(--glass-bg-hover)" : "var(--bg-surface)",
+          border: `1px solid ${showProfilePopup ? "var(--glass-border-strong)" : "var(--glass-border)"}`,
+          color: "var(--text-primary)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: collapsed ? "center" : "flex-start",
+          gap: 10,
           flexShrink: 0,
-          transition:
-            "background 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
-          cursor: "pointer",
-          position: "relative",
-          ...(collapsed ? {
-            display: "flex", justifyContent: "center",
-            padding: "8px 0 12px",
-          } : {}),
+          textAlign: "left",
+          transition: "background 0.15s ease, border-color 0.15s ease",
         }}
-        onClick={() => !collapsed && setShowProfilePopup((v) => !v)}
-        onMouseEnter={(e) => {
-          const el = e.currentTarget
-          el.style.background = "var(--glass-bg-hover)"
-          el.style.borderColor = "var(--glass-border-strong)"
-          el.style.transform = "translateY(-1px)"
+        onMouseEnter={e => {
+          e.currentTarget.style.background = "var(--glass-bg-hover)"
+          e.currentTarget.style.borderColor = "var(--glass-border-strong)"
         }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget
-          el.style.background = "var(--glass-bg)"
-          el.style.borderColor = "var(--glass-border)"
-          el.style.transform = "translateY(0)"
+        onMouseLeave={e => {
+          if (!showProfilePopup) {
+            e.currentTarget.style.background = "var(--bg-surface)"
+            e.currentTarget.style.borderColor = "var(--glass-border)"
+          }
         }}
       >
-        {/* Avatar */}
-        <div
-          style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "50%",
-            flexShrink: 0,
-            position: "relative",
-            overflow: "visible",
-          }}
-        >
-          {avatar ? (
-            <img
-              src={avatar}
-              alt="avatar"
-              style={{
-                width: "100%",
-                height: "100%",
-                borderRadius: "50%",
-                objectFit: "cover",
-                border: `2px solid ${cfg.color}`,
-                boxShadow: cfg.glow,
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                borderRadius: "50%",
-                background:
-                  "linear-gradient(135deg, var(--glow-b), var(--glow-c))",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "white",
-                border: `2px solid ${cfg.color}`,
-                boxShadow: cfg.glow,
-              }}
-            >
-              {name.charAt(0).toUpperCase()}
-            </div>
-          )}
+        <Avatar avatar={avatar} name={name} status={status} size={collapsed ? 32 : 34} />
 
-          {/* Status dot overlay */}
-          <span
-            style={{
-              position: "absolute",
-              bottom: "-1px",
-              right: "-1px",
-              width: "10px",
-              height: "10px",
-              borderRadius: "50%",
-              background: cfg.color,
-              border: "2px solid var(--bg-surface)",
-              boxShadow: cfg.glow,
-              animation: "pulse-glow 2s ease-in-out infinite",
-            }}
-          />
-        </div>
-
-        {/* Name + Status text */}
         {!collapsed && (
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div
-              className="font-semibold truncate"
-              style={{ fontSize: "12px", color: "var(--text-primary)" }}
-            >
-              {name}
-            </div>
-            <div
-              className="flex items-center gap-1"
-              style={{ fontSize: "10px", color: cfg.color }}
-            >
-              {cfg.label}
-            </div>
-          </div>
-        )}
+          <>
+            <span style={{ minWidth: 0, flex: 1 }}>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--text-primary)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {name}
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 4,
+                  padding: "2px 7px",
+                  borderRadius: 999,
+                  background: cfg.wash,
+                  border: `1px solid ${cfg.border}`,
+                  color: cfg.color,
+                  fontSize: "9.5px",
+                  fontWeight: 700,
+                }}
+              >
+                <span
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: "50%",
+                    background: cfg.color,
+                  }}
+                />
+                {cfg.label}
+              </span>
+            </span>
 
-        {/* Chevron */}
-        {!collapsed && (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            style={{
-              color: "var(--text-tertiary)",
-              flexShrink: 0,
-              transform: showProfilePopup ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.2s ease",
-            }}
-          >
-            <path
-              d="M3 4.5L6 7.5L9 4.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              style={{
+                color: "var(--text-tertiary)",
+                flexShrink: 0,
+                transform: showProfilePopup ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              <path
+                d="M3 4.5L6 7.5L9 4.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </>
         )}
-      </div>
+      </button>
 
-      {/* ── Profile popup ── */}
       {showProfilePopup && (
         <>
-          {/* Backdrop */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 998 }}
             onClick={() => {
               setShowProfilePopup(false)
-              setShowStatusMenu(false)
               if (editing) commitName()
             }}
           />
@@ -246,363 +284,200 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
           <div
             style={{
               position: "absolute",
-              bottom: "76px",
-              left: "12px",
-              right: "12px",
+              bottom: collapsed ? "12px" : "82px",
+              left: collapsed ? "66px" : "12px",
+              right: collapsed ? "auto" : "12px",
+              width: collapsed ? 272 : "auto",
               zIndex: 999,
-              borderRadius: "var(--radius-lg)",
-              padding: "16px",
-              background: "rgba(16, 19, 36, 0.97)",
+              borderRadius: "12px",
+              padding: 14,
+              background: "var(--bg-surface)",
               border: "1px solid var(--glass-border-strong)",
-              backdropFilter: "blur(24px) saturate(160%)",
-              WebkitBackdropFilter: "blur(24px) saturate(160%)",
               boxShadow:
-                "0 -12px 40px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255,255,255,0.08)",
-              animation: "profilePopupIn 0.2s ease",
+                "0 18px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03)",
+              animation: "profilePopupIn 0.16s ease",
             }}
           >
-            {/* ── Avatar section ── */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "12px",
-                marginBottom: "16px",
-              }}
-            >
-              {/* Large avatar */}
-              <div
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleAvatarClick()
-                }}
-                style={{
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "50%",
-                  position: "relative",
-                  cursor: "pointer",
-                  transition: "transform 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "scale(1.05)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)"
-                }}
-              >
-                {avatar ? (
-                  <img
-                    src={avatar}
-                    alt="avatar"
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Avatar
+                avatar={avatar}
+                name={name}
+                status={status}
+                size={58}
+                onClick={() => fileRef.current?.click()}
+              />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    letterSpacing: "0.6px",
+                    textTransform: "uppercase",
+                    color: "var(--text-tertiary)",
+                    marginBottom: 5,
+                  }}
+                >
+                  Profile
+                </div>
+
+                {editing ? (
+                  <input
+                    ref={nameRef}
+                    value={draftName}
+                    onChange={e => setDraftName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") commitName()
+                      if (e.key === "Escape") {
+                        setDraftName(name)
+                        setEditing(false)
+                      }
+                    }}
+                    onBlur={commitName}
+                    maxLength={24}
                     style={{
                       width: "100%",
-                      height: "100%",
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                      border: `2px solid ${cfg.color}`,
+                      padding: "7px 9px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      borderRadius: "8px",
+                      background: "var(--glass-bg)",
+                      border: "1px solid var(--accent-border)",
+                      color: "var(--text-primary)",
+                      outline: "none",
                     }}
                   />
                 ) : (
-                  <div
+                  <button
+                    onClick={() => {
+                      setEditing(true)
+                      setTimeout(() => nameRef.current?.focus(), 40)
+                    }}
                     style={{
-                      width: "100%",
-                      height: "100%",
-                      borderRadius: "50%",
-                      background:
-                        "linear-gradient(135deg, var(--glow-b), var(--glow-c))",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "24px",
+                      display: "block",
+                      maxWidth: "100%",
+                      padding: 0,
+                      color: "var(--text-primary)",
+                      fontSize: "15px",
                       fontWeight: 700,
-                      color: "white",
-                      border: `2px solid ${cfg.color}`,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {name.charAt(0).toUpperCase()}
-                  </div>
+                    {name}
+                  </button>
                 )}
 
-                {/* Camera overlay on hover */}
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: "50%",
-                    background: "rgba(0,0,0,0.45)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    opacity: 0,
-                    transition: "opacity 0.15s ease",
-                    fontSize: "18px",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = "1"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = "0"
-                  }}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                <div style={{ marginTop: 7, display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    style={{
+                      padding: "5px 8px",
+                      borderRadius: "7px",
+                      background: "var(--glass-bg)",
+                      border: "1px solid var(--glass-border)",
+                      color: "var(--text-secondary)",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                    }}
                   >
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                </div>
-
-                {/* Status dot */}
-                <span
-                  style={{
-                    position: "absolute",
-                    bottom: "0px",
-                    right: "0px",
-                    width: "14px",
-                    height: "14px",
-                    borderRadius: "50%",
-                    background: cfg.color,
-                    border: "2.5px solid rgba(16, 19, 36, 0.97)",
-                    boxShadow: cfg.glow,
-                  }}
-                />
-              </div>
-
-              {/* Remove avatar button */}
-              {avatar && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setAvatar(null)
-                  }}
-                  style={{
-                    fontSize: "10px",
-                    color: "var(--text-tertiary)",
-                    padding: "2px 8px",
-                    borderRadius: "8px",
-                    transition: "color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--color-red)"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-tertiary)"
-                  }}
-                >
-                  Remove photo
-                </button>
-              )}
-            </div>
-
-            {/* ── Name field ── */}
-            <div style={{ marginBottom: "12px" }}>
-              <div
-                style={{
-                  fontSize: "9.5px",
-                  fontWeight: 600,
-                  color: "var(--text-tertiary)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  marginBottom: "6px",
-                }}
-              >
-                Display Name
-              </div>
-              {editing ? (
-                <input
-                  ref={nameRef}
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitName()
-                    if (e.key === "Escape") {
-                      setDraftName(name)
-                      setEditing(false)
-                    }
-                  }}
-                  onBlur={commitName}
-                  onClick={(e) => e.stopPropagation()}
-                  maxLength={24}
-                  style={{
-                    width: "100%",
-                    padding: "7px 10px",
-                    fontSize: "12.5px",
-                    borderRadius: "var(--radius-sm)",
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid var(--accent-border)",
-                    color: "var(--text-primary)",
-                    outline: "none",
-                    boxShadow: "0 0 0 3px var(--accent-glow)",
-                  }}
-                />
-              ) : (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    startEditing()
-                  }}
-                  style={{
-                    padding: "7px 10px",
-                    fontSize: "12.5px",
-                    borderRadius: "var(--radius-sm)",
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid var(--glass-border)",
-                    color: "var(--text-primary)",
-                    cursor: "text",
-                    transition: "border-color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor =
-                      "var(--glass-border-strong)"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--glass-border)"
-                  }}
-                >
-                  {name}
-                </div>
-              )}
-            </div>
-
-            {/* ── Divider ── */}
-            <div
-              style={{
-                height: "1px",
-                background: "var(--glass-border)",
-                margin: "12px 0",
-              }}
-            />
-
-            {/* ── Status selector ── */}
-            <div>
-              <div
-                style={{
-                  fontSize: "9.5px",
-                  fontWeight: 600,
-                  color: "var(--text-tertiary)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  marginBottom: "8px",
-                }}
-              >
-                Status
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "3px",
-                }}
-              >
-                {(
-                  Object.entries(STATUS_CONFIG) as [
-                    UserStatus,
-                    (typeof STATUS_CONFIG)[UserStatus],
-                  ][]
-                ).map(([key, val]) => {
-                  const isActive = status === key
-                  return (
+                    Change photo
+                  </button>
+                  {avatar && (
                     <button
-                      key={key}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setStatus(key)
-                      }}
+                      onClick={() => setAvatar(null)}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        width: "100%",
-                        padding: "8px 10px",
-                        borderRadius: "var(--radius-sm)",
-                        fontSize: "12px",
-                        fontWeight: isActive ? 600 : 400,
-                        color: isActive ? val.color : "var(--text-secondary)",
-                        background: isActive
-                          ? `${val.color}15`
-                          : "transparent",
-                        border: `1px solid ${isActive ? `${val.color}30` : "transparent"}`,
-                        textAlign: "left",
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.background =
-                            "var(--glass-bg-hover)"
-                          e.currentTarget.style.color = "var(--text-primary)"
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.background = "transparent"
-                          e.currentTarget.style.color = "var(--text-secondary)"
-                        }
+                        padding: "5px 8px",
+                        borderRadius: "7px",
+                        background: "rgba(248,113,113,0.08)",
+                        border: "1px solid rgba(248,113,113,0.18)",
+                        color: "var(--color-red)",
+                        fontSize: "10px",
+                        fontWeight: 700,
                       }}
                     >
-                      {/* Status dot */}
-                      <span
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          background: val.color,
-                          boxShadow: isActive ? val.glow : "none",
-                          flexShrink: 0,
-                          animation: isActive
-                            ? "pulse-glow 2s ease-in-out infinite"
-                            : "none",
-                        }}
-                      />
-                      {val.label}
-
-                      {/* Checkmark */}
-                      {isActive && (
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 14 14"
-                          fill="none"
-                          style={{ marginLeft: "auto" }}
-                        >
-                          <path
-                            d="M3.5 7L6 9.5L10.5 4.5"
-                            stroke={val.color}
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
+                      Remove
                     </button>
-                  )
-                })}
+                  )}
+                </div>
               </div>
+            </div>
+
+            <div style={{ height: 1, background: "var(--glass-border)", margin: "14px 0" }} />
+
+            <div
+              style={{
+                fontSize: "9px",
+                fontWeight: 700,
+                letterSpacing: "0.6px",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+                marginBottom: 8,
+              }}
+            >
+              Status
+            </div>
+
+            <div style={{ display: "grid", gap: 6 }}>
+              {(
+                Object.entries(STATUS_CONFIG) as [
+                  UserStatus,
+                  (typeof STATUS_CONFIG)[UserStatus],
+                ][]
+              ).map(([key, val]) => {
+                const active = status === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setStatus(key)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 9,
+                      width: "100%",
+                      padding: "8px 10px",
+                      borderRadius: "9px",
+                      background: active ? val.wash : "transparent",
+                      border: `1px solid ${active ? val.border : "var(--glass-border)"}`,
+                      color: active ? val.color : "var(--text-secondary)",
+                      fontSize: "12px",
+                      fontWeight: active ? 700 : 600,
+                      textAlign: "left",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: val.color,
+                        boxShadow: active ? `0 0 0 3px ${val.wash}` : "none",
+                      }}
+                    />
+                    <span style={{ flex: 1 }}>{val.label}</span>
+                    {active && (
+                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                        <path
+                          d="M3.5 7L6 9.5L10.5 4.5"
+                          stroke={val.color}
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </>
       )}
 
-      {/* ── Scoped keyframes ── */}
       <style>{`
         @keyframes profilePopupIn {
-          from {
-            opacity: 0;
-            transform: translateY(8px) scale(0.96);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
+          from { opacity: 0; transform: translateY(6px) scale(0.98); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </>
