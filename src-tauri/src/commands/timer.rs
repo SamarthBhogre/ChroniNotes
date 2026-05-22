@@ -2,6 +2,7 @@ use crate::db::Database;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_notification::NotificationExt;
 
@@ -40,6 +41,7 @@ pub struct TimerState {
     pub pomodoro_mode: Mutex<String>, // "work" | "break"
     pub pomodoro_running: Mutex<bool>,
     pub pomodoro_paused: Mutex<bool>,
+    pub pomodoro_end: Mutex<Option<SystemTime>>,
     pub work_seconds_elapsed: Mutex<i64>,
 
     pub stopwatch_seconds: Mutex<i64>,
@@ -54,6 +56,7 @@ impl TimerState {
             pomodoro_mode: Mutex::new("work".to_string()),
             pomodoro_running: Mutex::new(false),
             pomodoro_paused: Mutex::new(false),
+            pomodoro_end: Mutex::new(None),
             work_seconds_elapsed: Mutex::new(0),
             stopwatch_seconds: Mutex::new(0),
             stopwatch_running: Mutex::new(false),
@@ -174,6 +177,11 @@ pub fn pomodoro_start(
     let mut paused = lock!(timer.pomodoro_paused)?;
 
     if *paused && !*running {
+        let remaining = *lock!(timer.pomodoro_seconds)?;
+
+        let end = SystemTime::now() + Duration::from_secs(remaining as u64);
+
+        *lock!(timer.pomodoro_end)? = Some(end);
         *paused = false;
         *running = true;
         drop(running);
@@ -188,9 +196,11 @@ pub fn pomodoro_start(
     }
 
     let settings = get_settings(&db);
+    let end = SystemTime::now() + Duration::from_secs((settings.work_minutes * 60) as u64);
     *lock!(timer.pomodoro_seconds)? = settings.work_minutes * 60;
     *lock!(timer.pomodoro_mode)? = "work".to_string();
     *lock!(timer.work_seconds_elapsed)? = 0;
+    *lock!(timer.pomodoro_end)? = Some(end);
     *paused = false;
     *running = true;
 
@@ -245,7 +255,27 @@ fn spawn_pomodoro_loop(app: AppHandle, db: Database, timer: Arc<TimerState>) {
             }
         };
 
-        *seconds -= 1;
+        let end = match lock!(timer.pomodoro_end) {
+            Ok(g) => match *g {
+                Some(end) => end,
+                None => {
+                    log::error!("[Timer] pomodoro_end is None");
+                    break;
+                }
+            },
+            Err(e) => {
+                log::error!("[Timer] {e}");
+                break;
+            }
+        };
+
+        let remaining = end
+            .duration_since(SystemTime::now())
+            .unwrap_or(Duration::ZERO)
+            .as_secs() as i64;
+
+        *seconds = remaining;
+
         if *mode == "work" {
             *work_elapsed += 1;
         }
@@ -271,6 +301,9 @@ fn spawn_pomodoro_loop(app: AppHandle, db: Database, timer: Arc<TimerState>) {
             if current_mode == "work" {
                 *mode = "break".to_string();
                 *seconds = settings.break_minutes * 60;
+                *lock!(timer.pomodoro_end).unwrap() = Some(
+                    SystemTime::now() + Duration::from_secs((settings.break_minutes * 60) as u64),
+                );
                 let _ = app
                     .notification()
                     .builder()
@@ -283,6 +316,9 @@ fn spawn_pomodoro_loop(app: AppHandle, db: Database, timer: Arc<TimerState>) {
             } else {
                 *mode = "work".to_string();
                 *seconds = settings.work_minutes * 60;
+                *lock!(timer.pomodoro_end).unwrap() = Some(
+                    SystemTime::now() + Duration::from_secs((settings.work_minutes * 60) as u64),
+                );
                 *work_elapsed = 0;
                 let _ = app
                     .notification()
@@ -302,6 +338,7 @@ fn spawn_pomodoro_loop(app: AppHandle, db: Database, timer: Arc<TimerState>) {
 pub fn pomodoro_pause(timer: State<Arc<TimerState>>) -> Result<(), String> {
     *lock!(timer.pomodoro_running)? = false;
     *lock!(timer.pomodoro_paused)? = true;
+    *lock!(timer.pomodoro_end)? = None;
     Ok(())
 }
 
@@ -320,6 +357,7 @@ pub fn pomodoro_stop(db: State<Database>, timer: State<Arc<TimerState>>) -> Resu
     *lock!(timer.pomodoro_mode)? = "work".to_string();
     *lock!(timer.pomodoro_paused)? = false;
     *lock!(timer.work_seconds_elapsed)? = 0;
+    *lock!(timer.pomodoro_end)? = None;
     Ok(())
 }
 
