@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { playSuccess } from "../lib/sounds"
+import { useUserStore } from "./user.store"
 
 /** Canonical status values — must match backend VALID_STATUSES exactly. */
 export type TaskStatus = "todo" | "in-progress" | "done"
@@ -24,6 +25,14 @@ export type Task = {
 export type DayActivity = {
   date: string   // "YYYY-MM-DD"
   count: number
+}
+
+function syncUserStatusWithActiveTask(tasks: Task[]) {
+  const user = useUserStore.getState()
+  const hasActiveTask = tasks.some(t => t.status === "in-progress" && !t.archived)
+  if (hasActiveTask && user.status === "idle") {
+    user.setStatus("working")
+  }
 }
 
 type TasksStore = {
@@ -53,6 +62,7 @@ export const useTasksStore = create<TasksStore>((set) => ({
   loadTasks: async () => {
     const data = await window.electron.invoke("tasks:list") as Task[]
     set({ tasks: data })
+    syncUserStatusWithActiveTask(data)
   },
 
   loadCompletionHistory: async () => {
@@ -81,6 +91,7 @@ export const useTasksStore = create<TasksStore>((set) => ({
         window.electron.invoke("tasks:completionHistory") as Promise<DayActivity[]>,
       ])
       set({ tasks, completionHistory: history })
+      syncUserStatusWithActiveTask(tasks)
     } catch (err) {
       console.error("updateStatus failed — rolling back:", err)
       // Restore the snapshot so the UI reflects the true persisted state
@@ -119,6 +130,7 @@ export const useTasksStore = create<TasksStore>((set) => ({
       window.electron.invoke("tasks:completionHistory") as Promise<DayActivity[]>,
     ])
     set({ tasks, completionHistory: history })
+    syncUserStatusWithActiveTask(tasks)
   },
 
   loadArchivedTasks: async () => {
@@ -130,12 +142,14 @@ export const useTasksStore = create<TasksStore>((set) => ({
     await window.electron.invoke("tasks:archive", id)
     const data = await window.electron.invoke("tasks:list") as Task[]
     set({ tasks: data })
+    syncUserStatusWithActiveTask(data)
   },
 
   archiveDone: async () => {
     const count = await window.electron.invoke("tasks:archiveDone") as number
     const data = await window.electron.invoke("tasks:list") as Task[]
     set({ tasks: data })
+    syncUserStatusWithActiveTask(data)
     return count
   },
 
@@ -146,5 +160,6 @@ export const useTasksStore = create<TasksStore>((set) => ({
       window.electron.invoke("tasks:listArchived") as Promise<Task[]>,
     ])
     set({ tasks, archivedTasks: archived })
+    syncUserStatusWithActiveTask(tasks)
   },
 }))

@@ -162,16 +162,16 @@ export default function SpotifyPlayer() {
     }
   }, [setLoggedIn, fetchPlayback])
 
-  // Poll playback state only when SDK is not ready (Web API fallback path).
+  // Poll the Web API as the source of truth. The SDK can emit stale local state
+  // around device transfers, which makes controls appear to undo themselves.
   useEffect(() => {
     if (!loggedIn) return
-    if (sdkReady) return
     fetchPlayback()
-    pollRef.current = setInterval(fetchPlayback, 3000)
+    pollRef.current = setInterval(fetchPlayback, 5000)
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [loggedIn, fetchPlayback, sdkReady])
+  }, [loggedIn, fetchPlayback])
 
   // Auto-dismiss errors after 5s
   useEffect(() => {
@@ -320,63 +320,11 @@ export default function SpotifyPlayer() {
     await window.electron.invoke("spotify:setActiveDevice", { deviceId, play: false })
   }
 
-  const syncTrackFromSdk = async () => {
-    const player = sdkPlayerRef.current
-    if (!player) return
-    const state = await player.getCurrentState()
-    if (!state) return
-    const current = state.track_window.current_track
-    useSpotifyStore.setState({
-      track: {
-        name: current.name,
-        artist: current.artists.map((a) => a.name).join(", "),
-        album: current.album.name,
-        album_art_url: current.album.images[0]?.url ?? null,
-        duration_ms: current.duration_ms,
-        progress_ms: state.position,
-        is_playing: !state.paused,
-        track_uri: current.uri,
-      },
-    })
-  }
-
   const handlePrevious = async () => {
-    const player = sdkPlayerRef.current
-    if (player) {
-      try {
-        const state = await player.getCurrentState()
-        if (state) {
-          await ensureSdkDeviceActive()
-          await player.previousTrack()
-          await sleep(250)
-          await syncTrackFromSdk()
-          return
-        }
-      } catch (e) {
-        const msg = String(e)
-        if (!isNoListLoadedMessage(msg)) throw e
-      }
-    }
     await apiPrevious()
   }
 
   const handlePlayPause = async () => {
-    const player = sdkPlayerRef.current
-    if (player) {
-      try {
-        const state = await player.getCurrentState()
-        if (state) {
-          await ensureSdkDeviceActive()
-          await player.togglePlay()
-          await sleep(150)
-          await syncTrackFromSdk()
-          return
-        }
-      } catch (e) {
-        const msg = String(e)
-        if (!isNoListLoadedMessage(msg)) throw e
-      }
-    }
     if (track?.is_playing) {
       await apiPause()
     } else {
@@ -385,22 +333,6 @@ export default function SpotifyPlayer() {
   }
 
   const handleNext = async () => {
-    const player = sdkPlayerRef.current
-    if (player) {
-      try {
-        const state = await player.getCurrentState()
-        if (state) {
-          await ensureSdkDeviceActive()
-          await player.nextTrack()
-          await sleep(250)
-          await syncTrackFromSdk()
-          return
-        }
-      } catch (e) {
-        const msg = String(e)
-        if (!isNoListLoadedMessage(msg)) throw e
-      }
-    }
     await apiNext()
   }
 

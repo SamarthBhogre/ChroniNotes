@@ -4,6 +4,9 @@ import {
   useUserStore,
   type UserStatus,
 } from "../../store/user.store"
+import { useTimerStore } from "../../store/timer.store"
+
+const STATUS_ORDER: UserStatus[] = ["working", "meeting", "dnd", "idle", "custom"]
 
 function resizeImage(file: File, maxSize = 256): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -125,19 +128,180 @@ function Avatar({
   )
 }
 
+function statusLabel(status: UserStatus, customStatus: string) {
+  return status === "custom" ? customStatus : STATUS_CONFIG[status].label
+}
+
+function formatDuration(seconds: number) {
+  if (seconds < 60) return "<1m"
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) return `${hours}h ${minutes.toString().padStart(2, "0")}m`
+  return `${minutes}m`
+}
+
+function ActivitySummary({
+  customStatus,
+  activity,
+}: {
+  customStatus: string
+  activity: Partial<Record<UserStatus, number>>
+}) {
+  const entries = STATUS_ORDER
+    .map(status => ({ status, seconds: activity[status] ?? 0 }))
+    .filter(item => item.seconds > 0)
+    .sort((a, b) => b.seconds - a.seconds)
+  const total = entries.reduce((sum, item) => sum + item.seconds, 0)
+  const top = entries.slice(0, 2)
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        padding: 12,
+        borderRadius: 10,
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid var(--glass-border)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "9px",
+          fontWeight: 800,
+          letterSpacing: "0.5px",
+          textTransform: "uppercase",
+          color: "var(--text-tertiary)",
+          marginBottom: 10,
+        }}
+      >
+        Today's activity
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+        {(top.length ? top : [{ status: "idle" as UserStatus, seconds: 0 }]).map(item => {
+          const cfg = STATUS_CONFIG[item.status]
+          return (
+            <div
+              key={item.status}
+              style={{
+                padding: "9px 10px",
+                borderRadius: 8,
+                background: "rgba(0,0,0,0.18)",
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: item.seconds > 0 ? cfg.color : "var(--text-tertiary)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {statusLabel(item.status, customStatus)}
+              </div>
+              <div style={{ marginTop: 4, color: "var(--text-primary)", fontSize: 18, fontWeight: 800 }}>
+                {formatDuration(item.seconds)}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ display: "grid", gap: 7 }}>
+        {(entries.length ? entries : [{ status: "idle" as UserStatus, seconds: 0 }]).map(item => {
+          const cfg = STATUS_CONFIG[item.status]
+          const pct = total > 0 ? Math.max(5, (item.seconds / total) * 100) : 8
+          return (
+            <div key={item.status} style={{ display: "grid", gridTemplateColumns: "78px 1fr", gap: 8, alignItems: "center" }}>
+              <span
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {statusLabel(item.status, customStatus)}
+              </span>
+              <span style={{ height: 5, borderRadius: 999, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                <span
+                  style={{
+                    display: "block",
+                    width: `${pct}%`,
+                    height: "100%",
+                    borderRadius: 999,
+                    background: cfg.color,
+                  }}
+                />
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function UserProfileCard({ collapsed = false }: { collapsed?: boolean }) {
-  const { name, avatar, status, setName, setAvatar, setStatus, hydrate } =
+  const { name, avatar, status, customStatus, setName, setAvatar, setStatus, setCustomStatus, getTodayActivity, hydrate } =
     useUserStore()
+  const startTimer = useTimerStore(s => s.start)
+  const setTimerTool = useTimerStore(s => s.setTool)
+  const timerRunning = useTimerStore(s => s.isRunning)
+  const timerTool = useTimerStore(s => s.tool)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   const [showProfilePopup, setShowProfilePopup] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draftName, setDraftName] = useState(name)
+  const [draftCustomStatus, setDraftCustomStatus] = useState(customStatus)
+  const [activityTick, setActivityTick] = useState(0)
+  const [popupRect, setPopupRect] = useState({ left: 12, bottom: 82, width: 288 })
 
   useEffect(() => { hydrate() }, [])
   useEffect(() => { setDraftName(name) }, [name])
+  useEffect(() => { setDraftCustomStatus(customStatus) }, [customStatus])
+  useEffect(() => {
+    if (!showProfilePopup) return
+    const timer = setInterval(() => setActivityTick(t => t + 1), 30000)
+    return () => clearInterval(timer)
+  }, [showProfilePopup])
+  useEffect(() => {
+    if (!showProfilePopup) return
+
+    const updatePopupRect = () => {
+      const rect = buttonRef.current?.getBoundingClientRect()
+      if (!rect) return
+
+      const targetWidth = collapsed
+        ? 288
+        : Math.min(340, Math.max(288, rect.width))
+      const preferredLeft = collapsed ? rect.right + 10 : rect.left
+      const maxLeft = Math.max(12, window.innerWidth - targetWidth - 12)
+
+      setPopupRect({
+        left: Math.min(Math.max(12, preferredLeft), maxLeft),
+        bottom: Math.max(12, window.innerHeight - rect.top + 8),
+        width: targetWidth,
+      })
+    }
+
+    updatePopupRect()
+    window.addEventListener("resize", updatePopupRect)
+    window.addEventListener("scroll", updatePopupRect, true)
+    return () => {
+      window.removeEventListener("resize", updatePopupRect)
+      window.removeEventListener("scroll", updatePopupRect, true)
+    }
+  }, [collapsed, showProfilePopup])
 
   const handleFileChange = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
@@ -161,6 +325,9 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
   }
 
   const cfg = STATUS_CONFIG[status]
+  const activeStatusLabel = statusLabel(status, customStatus)
+  const activity = getTodayActivity()
+  void activityTick
 
   return (
     <>
@@ -173,15 +340,16 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
       />
 
       <button
+        ref={buttonRef}
         onClick={() => setShowProfilePopup(v => !v)}
         style={{
-          margin: collapsed ? "8px auto 12px" : "10px 12px 14px",
-          width: collapsed ? 42 : "calc(100% - 24px)",
+          margin: collapsed ? "8px auto 12px" : "10px 10px 14px",
+          width: collapsed ? 42 : "calc(100% - 20px)",
           minHeight: collapsed ? 42 : 58,
           padding: collapsed ? 0 : "10px 12px",
           borderRadius: "10px",
-          background: showProfilePopup ? "var(--glass-bg-hover)" : "var(--bg-surface)",
-          border: `1px solid ${showProfilePopup ? "var(--glass-border-strong)" : "var(--glass-border)"}`,
+          background: showProfilePopup ? "var(--glass-bg-hover)" : "rgba(255,255,255,0.025)",
+          border: `1px solid ${showProfilePopup ? "var(--accent-border)" : "var(--glass-border)"}`,
           color: "var(--text-primary)",
           display: "flex",
           alignItems: "center",
@@ -189,7 +357,8 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
           gap: 10,
           flexShrink: 0,
           textAlign: "left",
-          transition: "background 0.15s ease, border-color 0.15s ease",
+          transition: "background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease",
+          boxShadow: showProfilePopup ? "0 0 18px rgba(0,0,0,0.22)" : "none",
         }}
         onMouseEnter={e => {
           e.currentTarget.style.background = "var(--glass-bg-hover)"
@@ -197,7 +366,7 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
         }}
         onMouseLeave={e => {
           if (!showProfilePopup) {
-            e.currentTarget.style.background = "var(--bg-surface)"
+            e.currentTarget.style.background = "rgba(255,255,255,0.025)"
             e.currentTarget.style.borderColor = "var(--glass-border)"
           }
         }}
@@ -243,7 +412,7 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
                     background: cfg.color,
                   }}
                 />
-                {cfg.label}
+                {activeStatusLabel}
               </span>
             </span>
 
@@ -283,11 +452,13 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
 
           <div
             style={{
-              position: "absolute",
-              bottom: collapsed ? "12px" : "82px",
-              left: collapsed ? "66px" : "12px",
-              right: collapsed ? "auto" : "12px",
-              width: collapsed ? 272 : "auto",
+              position: "fixed",
+              bottom: popupRect.bottom,
+              left: popupRect.left,
+              width: popupRect.width,
+              maxWidth: "calc(100vw - 24px)",
+              maxHeight: "calc(100vh - 24px)",
+              overflowY: "auto",
               zIndex: 999,
               borderRadius: "12px",
               padding: 14,
@@ -298,7 +469,7 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
               animation: "profilePopupIn 0.16s ease",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
               <Avatar
                 avatar={avatar}
                 name={name}
@@ -368,10 +539,11 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
                   </button>
                 )}
 
-                <div style={{ marginTop: 7, display: "flex", gap: 6 }}>
+                <div style={{ marginTop: 7, display: "flex", flexWrap: "wrap", gap: 6 }}>
                   <button
                     onClick={() => fileRef.current?.click()}
                     style={{
+                      flex: "1 1 92px",
                       padding: "5px 8px",
                       borderRadius: "7px",
                       background: "var(--glass-bg)",
@@ -387,6 +559,7 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
                     <button
                       onClick={() => setAvatar(null)}
                       style={{
+                        flex: "1 1 74px",
                         padding: "5px 8px",
                         borderRadius: "7px",
                         background: "rgba(248,113,113,0.08)",
@@ -419,12 +592,8 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
             </div>
 
             <div style={{ display: "grid", gap: 6 }}>
-              {(
-                Object.entries(STATUS_CONFIG) as [
-                  UserStatus,
-                  (typeof STATUS_CONFIG)[UserStatus],
-                ][]
-              ).map(([key, val]) => {
+              {STATUS_ORDER.map((key) => {
+                const val = STATUS_CONFIG[key]
                 const active = status === key
                 return (
                   <button
@@ -454,7 +623,7 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
                         boxShadow: active ? `0 0 0 3px ${val.wash}` : "none",
                       }}
                     />
-                    <span style={{ flex: 1 }}>{val.label}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>{statusLabel(key, customStatus)}</span>
                     {active && (
                       <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                         <path
@@ -470,6 +639,77 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
                 )
               })}
             </div>
+
+            <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
+              <input
+                value={draftCustomStatus}
+                onChange={e => setDraftCustomStatus(e.target.value)}
+                onBlur={() => setCustomStatus(draftCustomStatus)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    setCustomStatus(draftCustomStatus)
+                    setStatus("custom")
+                    e.currentTarget.blur()
+                  }
+                }}
+                maxLength={32}
+                placeholder="Custom status"
+                style={{
+                  minWidth: 0,
+                  flex: 1,
+                  padding: "7px 9px",
+                  borderRadius: 8,
+                  background: "var(--glass-bg)",
+                  border: "1px solid var(--glass-border)",
+                  color: "var(--text-primary)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={() => {
+                  setCustomStatus(draftCustomStatus)
+                  setStatus("custom")
+                }}
+                style={{
+                  padding: "7px 9px",
+                  borderRadius: 8,
+                  background: STATUS_CONFIG.custom.wash,
+                  border: `1px solid ${STATUS_CONFIG.custom.border}`,
+                  color: STATUS_CONFIG.custom.color,
+                  fontSize: 10,
+                  fontWeight: 800,
+                }}
+              >
+                Set
+              </button>
+            </div>
+
+            <button
+              onClick={async () => {
+                setStatus("working")
+                if (!timerRunning || timerTool !== "pomodoro") {
+                  setTimerTool("pomodoro")
+                  await startTimer()
+                }
+              }}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                padding: "8px 10px",
+                borderRadius: 9,
+                background: STATUS_CONFIG.working.wash,
+                border: `1px solid ${STATUS_CONFIG.working.border}`,
+                color: STATUS_CONFIG.working.color,
+                fontSize: 11,
+                fontWeight: 800,
+              }}
+            >
+              {timerRunning && timerTool === "pomodoro" ? "Focus timer running" : "Start Working focus timer"}
+            </button>
+
+            <ActivitySummary customStatus={customStatus} activity={activity} />
           </div>
         </>
       )}

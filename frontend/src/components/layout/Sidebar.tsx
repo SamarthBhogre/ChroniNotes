@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react"
 import UserProfileCard from "./UserProfileCard"
 import SpotifyPlayer from "../SpotifyPlayer"
 import { useTasksStore } from "../../store/tasks.store"
@@ -38,6 +38,17 @@ const NAV_SECTIONS: NavSection[] = [
 
 const ALL_ITEMS = NAV_SECTIONS.flatMap(s => s.items)
 const STORAGE_KEY = "chorniNotes-sidebar-collapsed"
+const WIDTH_STORAGE_KEY = "chorniNotes-sidebar-width"
+const COLLAPSED_WIDTH = 60
+const DEFAULT_WIDTH = 240
+const MIN_WIDTH = 200
+const MAX_WIDTH = 360
+
+function getStoredSidebarWidth() {
+  const value = Number(localStorage.getItem(WIDTH_STORAGE_KEY))
+  if (!Number.isFinite(value)) return DEFAULT_WIDTH
+  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, value))
+}
 
 function useNavEntrance(_count: number) {
   const refs = useRef<(HTMLButtonElement | null)[]>([])
@@ -59,6 +70,10 @@ function useNavEntrance(_count: number) {
 export default function Sidebar({ current, onChange }: Props) {
   const [pressed, setPressed] = useState<Page | null>(null)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEY) === "true")
+  const [expandedWidth, setExpandedWidth] = useState(getStoredSidebarWidth)
+  const [resizing, setResizing] = useState(false)
+  const resizeStartRef = useRef({ x: 0, width: DEFAULT_WIDTH })
+  const latestWidthRef = useRef(expandedWidth)
   const navRefs = useNavEntrance(ALL_ITEMS.length)
 
   // Live stats for badges
@@ -78,6 +93,40 @@ export default function Sidebar({ current, onChange }: Props) {
     setCollapsed(next)
     localStorage.setItem(STORAGE_KEY, String(next))
   }
+
+  const startResize = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (collapsed) return
+    e.preventDefault()
+    resizeStartRef.current = { x: e.clientX, width: expandedWidth }
+    latestWidthRef.current = expandedWidth
+    setResizing(true)
+  }
+
+  useEffect(() => {
+    if (!resizing) return
+
+    const handleMove = (e: MouseEvent) => {
+      const delta = e.clientX - resizeStartRef.current.x
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, resizeStartRef.current.width + delta))
+      latestWidthRef.current = next
+      setExpandedWidth(next)
+    }
+    const handleUp = () => {
+      setResizing(false)
+      localStorage.setItem(WIDTH_STORAGE_KEY, String(latestWidthRef.current))
+    }
+
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+    window.addEventListener("mousemove", handleMove)
+    window.addEventListener("mouseup", handleUp)
+    return () => {
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+      window.removeEventListener("mousemove", handleMove)
+      window.removeEventListener("mouseup", handleUp)
+    }
+  }, [resizing])
 
   // Keyboard shortcuts: Ctrl+1-7
   useEffect(() => {
@@ -99,7 +148,7 @@ export default function Sidebar({ current, onChange }: Props) {
     return () => window.removeEventListener("keydown", handler)
   }, [collapsed])
 
-  const sidebarWidth = collapsed ? 60 : 200
+  const sidebarWidth = collapsed ? COLLAPSED_WIDTH : expandedWidth
 
   // Get badge for a nav item
   const getBadge = (id: Page): string | null => {
@@ -118,7 +167,7 @@ export default function Sidebar({ current, onChange }: Props) {
       borderRight: "1px solid var(--glass-border)",
       display: "flex", flexDirection: "column",
       position: "relative", zIndex: 20,
-      transition: "width 0.2s cubic-bezier(0.4,0,0.2,1)",
+      transition: resizing ? "none" : "width 0.2s cubic-bezier(0.4,0,0.2,1)",
       overflow: "hidden",
     }}>
       {/* ── Logo ── */}
@@ -350,6 +399,34 @@ export default function Sidebar({ current, onChange }: Props) {
       )}
 
       <UserProfileCard collapsed={collapsed} />
+
+      {!collapsed && (
+        <div
+          onMouseDown={startResize}
+          title="Resize sidebar"
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 8,
+            cursor: "col-resize",
+            zIndex: 30,
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 1,
+              background: resizing ? "var(--accent)" : "transparent",
+              boxShadow: resizing ? "0 0 10px var(--accent-glow)" : "none",
+            }}
+          />
+        </div>
+      )}
     </aside>
   )
 }

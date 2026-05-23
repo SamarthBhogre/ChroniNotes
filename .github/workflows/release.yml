@@ -37,8 +37,8 @@ jobs:
       - name: Build Tauri app
         run: npx tauri build
         env:
-          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
-          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID || '6784e18edfe0442e83fb819da2ffb6f7' }}
+          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:43821/spotify/callback' }}
 
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4

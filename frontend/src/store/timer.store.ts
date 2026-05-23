@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { playTimerComplete, playBreakStart } from "../lib/sounds"
+import { useUserStore } from "./user.store"
 
 type Mode = "work" | "break" | "stopwatch" | "timer"
 
@@ -41,6 +42,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   start: async () => {
     const { tool, customMinutes } = get()
+    if (tool === "pomodoro" && get().mode === "work") {
+      useUserStore.getState().setStatus("working")
+    }
     
     // For custom timer, set initial seconds before starting
     if (tool === "timer" && !get().isPaused) {
@@ -60,6 +64,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   pause: async () => {
     const { tool } = get()
+    if (tool === "pomodoro") {
+      useUserStore.getState().setStatus("idle")
+    }
     set({ isRunning: false, isPaused: true })
     
     if (tool === "pomodoro" || tool === "stopwatch") {
@@ -71,6 +78,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   stop: async () => {
     const { tool } = get()
+    if (tool === "pomodoro") {
+      useUserStore.getState().setStatus("idle")
+    }
     set({ isRunning: false, isPaused: false, seconds: 0, mode: "work" })
     
     if (tool === "pomodoro" || tool === "stopwatch") {
@@ -97,6 +107,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     const prev = useTimerStore.getState()
     if (prev.mode === "work" && data.mode === "break") playBreakStart()
     if (prev.mode === "break" && data.mode === "work") playTimerComplete()
+    if (prev.mode !== data.mode) {
+      useUserStore.getState().setStatus(data.mode === "work" ? "working" : "idle")
+    }
     set({ seconds: data.seconds, mode: data.mode })
   },
 }))
