@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.1.0] - 2026-05-23
+
+### Added
+
+- **User status system:** Replaced the old status set with Working, In a meeting, Do not disturb, Idle, and editable Custom status.
+- **Profile activity panel:** Added a "Today's activity" summary in the profile popup with status duration cards and proportional activity bars.
+- **Custom status editing:** Users can edit and apply a custom status directly from the profile menu.
+- **Working focus timer shortcut:** Profile menu can start a Pomodoro focus session and automatically set status to Working.
+- **Task/status integration:** Starting an in-progress task can automatically move the user from Idle to Working.
+
+### Changed
+
+- **Resizable sidebar:** Expanded sidebar width can now be dragged from the right edge and persists in local storage.
+- **Profile popup layout:** Profile controls now render in a fixed viewport popup with wrapping buttons and scroll support on smaller screens.
+- **Spotify playback controls:** Main playback buttons now use the backend Spotify Web API controls as the source of truth, avoiding SDK device-transfer interruptions.
+- **Release version:** Bumped ChroniNotes from 3.0.1 to 3.1.0 across package, Cargo, lockfile, and Tauri config metadata.
+
+### Fixed
+
+- **GitHub release build:** Release workflow now falls back to the public Spotify Client ID and loopback redirect URI when repository secrets are missing, preventing `SPOTIFY_CLIENT_ID is missing/empty` build failures.
+- **Spotify play/pause loop:** Removed the paused SDK device transfer before playback actions, fixing the issue where Spotify actions appeared to immediately undo themselves.
+- **Profile menu clipping:** Profile popup is no longer clipped by sidebar overflow.
+
+---
+
 ## [3.0.0] - 2026-03-08
 
 ### Added
