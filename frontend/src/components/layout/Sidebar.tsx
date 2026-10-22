@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react"
 import UserProfileCard from "./UserProfileCard"
-import SpotifyPlayer from "../SpotifyPlayer"
+import MediaPlayer from "../MediaPlayer"
 import { useTasksStore } from "../../store/tasks.store"
 import { useHabitsStore } from "../../store/habits.store"
 
@@ -160,7 +160,7 @@ export default function Sidebar({ current, onChange }: Props) {
   let navIndex = 0
 
   return (
-    <aside style={{
+    <aside className="spatial-sidebar" style={{
       width: `${sidebarWidth}px`, flexShrink: 0,
       marginTop: "40px",
       background: "rgba(255,255,255,0.02)",
@@ -374,7 +374,7 @@ export default function Sidebar({ current, onChange }: Props) {
         overflowX: "hidden",
         display: collapsed ? "none" : "block",
       }}>
-        <SpotifyPlayer />
+        <MediaPlayer />
       </div>
 
       {/* ── Expand button (collapsed mode) ── */}

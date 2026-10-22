@@ -9,6 +9,7 @@ import BrandLogo from "./components/BrandLogo"
 import { useThemeStore } from "./store/theme.store"
 
 import "./store/theme.store"
+import "./workspace.css"
 
 const Dashboard = lazy(() => import("./pages/Dashboard"))
 const Tasks     = lazy(() => import("./pages/Tasks"))
@@ -76,7 +77,7 @@ export default function App() {
   }, [showSettings, showAbout])
 
   return (
-    <div className="flex h-screen overflow-hidden"
+    <div className="spatial-app flex h-screen overflow-hidden"
       style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
 
       {showWelcome && <WelcomeScreen onFinished={() => setShowWelcome(false)} />}
@@ -104,13 +105,15 @@ export default function App() {
             if (memorySaver && !isActive) return null
 
             return (
-              <div key={p} style={{
+              <div key={p} className="page-scene" inert={!isActive} aria-hidden={!isActive} style={{
                 position: "absolute", inset: 0,
                 opacity: isActive ? 1 : 0,
+                visibility: isActive ? "visible" : "hidden",
                 pointerEvents: isActive ? "auto" : "none",
-                animation: isActive ? "pageEnter 0.25s ease" : "none",
+                animation: isActive ? "pageTurnIn 0.42s cubic-bezier(0.2,0.75,0.2,1) both" : "none",
                 overflow: p === "notes" ? "hidden" : "auto",
                 display: "flex", flexDirection: "column",
+                contain: "layout paint style",
               }}>
                 <Suspense fallback={<PageSkeleton />}>
                   {p === "dashboard" && <Dashboard onNavigate={navigate} />}

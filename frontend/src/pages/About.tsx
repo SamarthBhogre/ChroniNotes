@@ -83,7 +83,7 @@ const FEATURES = [
   { icon: "▦", title: "Calendar", desc: "Month, week, day, and agenda views with unified habit/countdown integration. Create events with type-coding and desktop notification reminders." },
   { icon: "⟡", title: "Habits", desc: "Daily habit tracker with streaks, heatmaps, build/break goal types, sections, archiving, and calendar-integrated completion indicators." },
   { icon: "⏳", title: "Countdown", desc: "Visual countdown timers to important dates with progress bars, color-coded cards, and calendar integration." },
-  { icon: "🎵", title: "Spotify", desc: "Integrated Spotify playback controls — play/pause, skip, shuffle, repeat modes — right in the sidebar without leaving the app." },
+  { icon: "🎵", title: "Media Controls", desc: "Universal playback controls for active system media sessions — Spotify, browsers, VLC, and more." },
   { icon: "🔔", title: "Reminders", desc: "Configurable desktop notifications for calendar events — 5 min, 15 min, 1 hour, or custom intervals before the event." },
   { icon: "🎨", title: "8 Themes", desc: "Midnight Indigo, Steel Blue, Warm Linen, Ember, Carbon, Black & Red, Smooth Blues, and Warm Red & Blue — each with its own palette." },
   { icon: "⚡", title: "Optimized", desc: "Performance-first design with Memory Saver that unmounts inactive pages to free RAM. Collapsible sidebar for maximum workspace." },
@@ -214,7 +214,7 @@ export default function About({ onClose }: AboutProps) {
                   productivity suite built for students. Manage your tasks with a kanban board, write
                   rich notes in a Notion-style editor, stay focused with Pomodoro timers, build daily habits
                   with streak tracking, set countdown timers to important dates, and plan your schedule with
-                  an integrated calendar — all with Spotify playback controls and without ever needing an internet connection.
+                  an integrated calendar — all with universal media controls and without ever needing an internet connection.
                 </p>
                 <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "10px 0 0" }}>
                   Your data lives in a local SQLite database on your machine. No accounts, no cloud sync,

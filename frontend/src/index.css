@@ -998,6 +998,31 @@ select option {
   }
 }
 
+/* Restrained depth cues for page changes and interactive calendar/timer surfaces. */
+.page-scene { transform-style: preserve-3d; backface-visibility: hidden; perspective: 1400px; }
+@keyframes pageTurnIn {
+  from { opacity: 0; transform: perspective(1400px) rotateY(-12deg) translateZ(-58px) scale(.96); filter: blur(3px); }
+  to   { opacity: 1; transform: perspective(1400px) rotateY(0) translateZ(0) scale(1); filter: blur(0); }
+}
+.dashboard-card-3d { transform-style: preserve-3d; will-change: transform; }
+.calendar-grid-3d { perspective: 900px; }
+.calendar-day-3d { transform-style: preserve-3d; transition: transform .28s cubic-bezier(.2,.75,.2,1), background .16s ease, box-shadow .2s ease; animation: calendarFlipIn .48s cubic-bezier(.2,.75,.2,1) both; }
+.calendar-day-3d:hover { transform: perspective(700px) translateZ(12px) rotateX(4deg) rotateY(-2deg) scale(1.025); box-shadow: 0 12px 24px rgba(0,0,0,.24); z-index: 1; }
+@keyframes calendarFlipIn { from { opacity: 0; transform: perspective(700px) rotateX(18deg) translateY(12px) translateZ(-22px); } to { opacity: 1; transform: perspective(700px) rotateX(0) translateY(0) translateZ(0); } }
+.timer-dial-3d { transform-style: preserve-3d; filter: drop-shadow(0 18px 28px rgba(0,0,0,.2)); animation: timerDialIn .75s cubic-bezier(.2,.75,.2,1) both; }
+.timer-dial-3d[data-running="true"] { animation: timerDialIn .75s cubic-bezier(.2,.75,.2,1) both, timerActive 4.5s ease-in-out 0.75s infinite alternate; }
+@keyframes timerDialIn {
+  from { opacity: .55; transform: perspective(900px) rotateX(24deg) rotateY(-8deg) translateY(16px) scale(.92); }
+  to { opacity: 1; transform: perspective(900px) rotateX(0) translateY(0) scale(1); }
+}
+@keyframes timerActive { from { transform: perspective(900px) rotateX(0) rotateY(-2deg) translateY(0); } to { transform: perspective(900px) rotateX(2deg) rotateY(2deg) translateY(-4px); } }
+.profile-popup-3d { transform-style: preserve-3d; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-scene, .calendar-day-3d, .timer-dial-3d, .profile-popup-3d { animation: none !important; transition: none !important; }
+  .calendar-day-3d:hover, .dashboard-card-3d:hover { transform: none !important; }
+}
+
 .page-enter {
   animation: pageEnter 0.3s ease forwards;
 }

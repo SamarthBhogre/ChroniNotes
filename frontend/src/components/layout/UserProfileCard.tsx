@@ -451,6 +451,7 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
           />
 
           <div
+            className="profile-popup-3d"
             style={{
               position: "fixed",
               bottom: popupRect.bottom,
@@ -716,8 +717,8 @@ export default function UserProfileCard({ collapsed = false }: { collapsed?: boo
 
       <style>{`
         @keyframes profilePopupIn {
-          from { opacity: 0; transform: translateY(6px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
+          from { opacity: 0; transform: perspective(700px) translateY(8px) rotateX(-4deg) scale(0.98); }
+          to   { opacity: 1; transform: perspective(700px) translateY(0) rotateX(0) scale(1); }
         }
       `}</style>
     </>

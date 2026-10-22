@@ -1,10 +1,10 @@
 mod commands;
 mod db;
+mod media;
 mod notifications;
 mod updater;
 
 use commands::notes::NotesRoot;
-use commands::spotify::SpotifyAuthState;
 use commands::timer::TimerState;
 use db::Database;
 use std::sync::Arc;
@@ -96,16 +96,6 @@ pub fn run() {
 
             let notes_root = NotesRoot::new(&app_data_dir);
             app.manage(notes_root);
-
-            // Spotify PKCE auth state (holds the code_verifier between
-            // login initiation and the OAuth callback).
-            app.manage(SpotifyAuthState::new());
-
-            // Ensure the Spotify tokens table exists.
-            {
-                let db_ref = app.state::<Database>();
-                commands::spotify::ensure_spotify_schema(&db_ref);
-            }
 
             // TimerState::new() returns Arc<TimerState>; manage the Arc so
             // commands can clone it cheaply into background threads without
@@ -207,23 +197,12 @@ pub fn run() {
             // Updater
             updater::updater_check,
             updater::updater_download_and_install,
-            // Spotify
-            commands::spotify::spotify_auth_status,
-            commands::spotify::spotify_get_access_token,
-            commands::spotify::spotify_login,
-            commands::spotify::spotify_logout,
-            commands::spotify::spotify_set_active_device,
-            commands::spotify::spotify_get_playback,
-            commands::spotify::spotify_play,
-            commands::spotify::spotify_pause,
-            commands::spotify::spotify_next,
-            commands::spotify::spotify_previous,
-            commands::spotify::spotify_set_volume,
-            commands::spotify::spotify_set_shuffle,
-            commands::spotify::spotify_set_repeat,
-            commands::spotify::spotify_get_devices,
-            commands::spotify::spotify_get_playlists,
-            commands::spotify::spotify_play_playlist,
+            // Media Session
+            commands::media::get_current_media,
+            commands::media::get_all_media_sessions,
+            commands::media::play_pause,
+            commands::media::next_track,
+            commands::media::previous_track,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

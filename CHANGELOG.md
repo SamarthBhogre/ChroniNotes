@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.4.0] - Unreleased
+
+### Added
+
+- **Windows system media player:** Added a sidebar player that reads the active Windows media session and available sessions. It displays source and track metadata and sends play/pause, next, and previous actions through Tauri commands.
+- **Studio page designs:** Added the reference layouts for Tasks, Notes, Timer, Calendar, Habits, and Countdown, including page headers and summary stats. Redesigned the Dashboard into a three-column tool grid with progress panels and activity widgets; the large promotional banner is omitted.
+- **Notes library control:** Added a show/hide control for the note library and improved keyboard access for note and folder cards.
+
+### Changed
+
+- **Spatial motion:** Added depth-based page transitions, lifted Dashboard cards, calendar date motion, a timer dial entrance and running animation, and a profile popup entrance. System reduced-motion preferences disable these effects.
+- **Responsive layouts:** Added adaptive studio layouts for smaller windows. Inactive pages are inert, hidden from rendering, and layout-contained while visited page state is retained.
+- **Calendar data:** Calendar refreshes task, countdown, and habit activity as related data changes and uses local calendar dates for habit summaries.
+- **Habit tracking:** Weekly goals use Monday–Sunday totals, and habit completion respects start dates and goal type.
+- **Release metadata:** Updated application, Cargo, and Tauri package versions to 3.4.0.
+
+### Removed
+
+- **Spotify-specific integration:** Removed Spotify OAuth, Web Playback SDK, and Spotify-only backend commands in favor of Windows system media controls.
+
+### Fixed
+
+- **Countdown date boundaries:** Countdowns now use local calendar-day calculations and refresh other views when countdown data changes.
+- **Timer tool switching:** Prevented changing timer modes while a session is running or paused.
+
 ## [3.1.0] - 2026-05-23
 
 ### Added

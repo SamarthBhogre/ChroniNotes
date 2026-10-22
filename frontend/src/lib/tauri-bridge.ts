@@ -87,6 +87,14 @@ export interface TimerUpdate {
 
 export interface UpdaterProgress { percent: number }
 
+export interface MediaInfo {
+  title: string
+  artist: string
+  source_app: string
+  thumbnail: string | null
+  is_playing: boolean
+}
+
 // ── Channel → Tauri command mapping ─────────────────────────────────────────
 
 const channelMap: Record<string, (payload?: unknown) => Promise<unknown>> = {
@@ -226,35 +234,12 @@ const channelMap: Record<string, (payload?: unknown) => Promise<unknown>> = {
   "updater:check":              ()  => invoke<UpdateInfo>("updater_check"),
   "updater:downloadAndInstall": (p) => { const { download_url, installer_name } = p as { download_url: string; installer_name: string }; return invoke<void>("updater_download_and_install", { downloadUrl: download_url, installerName: installer_name }); },
 
-  // ── Spotify ──
-  "spotify:authStatus":   ()  => invoke<{ logged_in: boolean }>("spotify_auth_status"),
-  "spotify:getAccessToken": () => invoke<string>("spotify_get_access_token"),
-  "spotify:login":        ()  => invoke<void>("spotify_login"),
-  "spotify:logout":       ()  => invoke<void>("spotify_logout"),
-  "spotify:setActiveDevice": (p) => {
-    const { deviceId, play } = p as { deviceId: string; play?: boolean }
-    return invoke<void>("spotify_set_active_device", { deviceId, play: play ?? false })
-  },
-  "spotify:getPlayback":  ()  => invoke<unknown>("spotify_get_playback"),
-  "spotify:play":         ()  => invoke<void>("spotify_play"),
-  "spotify:pause":        ()  => invoke<void>("spotify_pause"),
-  "spotify:next":         ()  => invoke<void>("spotify_next"),
-  "spotify:previous":     ()  => invoke<void>("spotify_previous"),
-  "spotify:setVolume":    (v) => invoke<void>("spotify_set_volume", { volume: v as number }),
-  "spotify:setShuffle":   (p) => {
-    const { state } = p as { state: boolean }
-    return invoke<void>("spotify_set_shuffle", { state })
-  },
-  "spotify:setRepeat":    (p) => {
-    const { state } = p as { state: string }
-    return invoke<void>("spotify_set_repeat", { state })
-  },
-  "spotify:getDevices":   ()  => invoke<unknown[]>("spotify_get_devices"),
-  "spotify:getPlaylists": ()  => invoke<unknown[]>("spotify_get_playlists"),
-  "spotify:playPlaylist": (p) => {
-    const { playlistUri, deviceId } = p as { playlistUri: string; deviceId?: string | null }
-    return invoke<void>("spotify_play_playlist", { playlistUri, deviceId: deviceId ?? null })
-  },
+  // Media Session
+  "media:getCurrent":     () => invoke<MediaInfo | null>("get_current_media"),
+  "media:getAllSessions": () => invoke<MediaInfo[]>("get_all_media_sessions"),
+  "media:playPause":      () => invoke<void>("play_pause"),
+  "media:next":           () => invoke<void>("next_track"),
+  "media:previous":       () => invoke<void>("previous_track"),
 }
 
 // ── NoteEntry (used inside channelMap above) ─────────────────────────────────
@@ -290,15 +275,6 @@ const eventListenerFactories: Record<
       listener(event.payload)
     }),
 
-  "spotify:auth-complete": (listener) =>
-    listen<void>("spotify:auth-complete", () => {
-      listener(undefined)
-    }),
-
-  "spotify:auth-error": (listener) =>
-    listen<string>("spotify:auth-error", (event) => {
-      listener(event.payload)
-    }),
 }
 
 // Expose the bridge on window.electron for backward compatibility
