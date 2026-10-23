@@ -366,7 +366,7 @@ export default function Sidebar({ current, onChange }: Props) {
         </button>
       )}
 
-      {/* ── Spotify Player ── */}
+      {/* ── Windows media session controls ── */}
       <div style={{
         flexShrink: 1,
         minHeight: 0,
