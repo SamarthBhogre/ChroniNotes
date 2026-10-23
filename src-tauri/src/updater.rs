@@ -277,20 +277,9 @@ pub async fn updater_download_and_install(
         downloaded
     );
 
-    // Launch the installer with UAC elevation (Windows only)
-    //
-    // The NSIS installer needs the current ChroniNotes process to be fully
-    // terminated before it can replace the executable.  We pass `/S` for
-    // silent mode so the user isn't prompted twice (they already confirmed
-    // in the UI).  We also pass `/D=<install_dir>` so NSIS installs over
-    // the existing installation rather than prompting for a new directory.
-    //
-    // The helper batch script:
-    //  1. Polls until our PID no longer exists (process fully exited)
-    //  2. Launches the NSIS installer with /S and /D=<install_dir>
-    //  3. Deletes itself
-    //
-    // We then exit the app so files are unlocked for NSIS.
+    // Start a detached PowerShell helper that waits for ChroniNotes to exit,
+    // then launches the NSIS installer. Machine-wide installs need elevation;
+    // per-user installs should not trigger an unnecessary UAC prompt.
     #[cfg(target_os = "windows")]
     {
         use std::ffi::OsStr;
@@ -304,51 +293,62 @@ pub async fn updater_download_and_install(
             .unwrap_or_default();
 
         let pid = std::process::id();
-        let batch_content = if install_dir.is_empty() {
-            // Fallback: no /D= flag, let NSIS use its default
-            format!(
-                "@echo off\r\n\
-                 :wait\r\n\
-                 tasklist /fi \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL\r\n\
-                 if not errorlevel 1 (\r\n\
-                   timeout /t 1 /nobreak >NUL\r\n\
-                   goto wait\r\n\
-                 )\r\n\
-                 start \"\" \"{installer}\" /S\r\n\
-                 del \"%~f0\"\r\n",
-                pid = pid,
-                installer = installer_path.to_string_lossy(),
-            )
-        } else {
-            format!(
-                "@echo off\r\n\
-                 :wait\r\n\
-                 tasklist /fi \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL\r\n\
-                 if not errorlevel 1 (\r\n\
-                   timeout /t 1 /nobreak >NUL\r\n\
-                   goto wait\r\n\
-                 )\r\n\
-                 start \"\" \"{installer}\" /S /D={dir}\r\n\
-                 del \"%~f0\"\r\n",
-                pid = pid,
-                installer = installer_path.to_string_lossy(),
-                dir = install_dir,
-            )
-        };
+        let installer_literal = installer_path
+            .to_string_lossy()
+            .replace('\'', "''");
+        let install_dir_literal = install_dir.replace('\'', "''");
+        let helper_script = format!(
+            "$ErrorActionPreference = 'Stop'\n\
+             $installer = '{installer}'\n\
+             $installDir = '{install_dir}'\n\
+             $parentId = {pid}\n\
+             $logPath = Join-Path $env:TEMP 'ChroniNotes-updater.log'\n\
+             try {{\n\
+               Wait-Process -Id $parentId -ErrorAction SilentlyContinue\n\
+               $installerArgs = @('/S')\n\
+               if ($installDir) {{ $installerArgs += \"/D=$installDir\" }}\n\
+               $machineInstall = $false\n\
+               foreach ($root in @($env:ProgramFiles, ${{env:ProgramFiles(x86)}})) {{\n\
+                 if ($root -and $installDir.StartsWith($root.TrimEnd('\\') + '\\', [StringComparison]::OrdinalIgnoreCase)) {{\n\
+                   $machineInstall = $true\n\
+                 }}\n\
+               }}\n\
+               if ($machineInstall) {{\n\
+                 Start-Process -FilePath $installer -ArgumentList $installerArgs -Verb RunAs -Wait\n\
+               }} else {{\n\
+                 Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait\n\
+               }}\n\
+             }} catch {{\n\
+               $message = 'ChroniNotes could not start the update installer: ' + $_.Exception.Message\n\
+               Add-Content -LiteralPath $logPath -Value $message\n\
+               try {{\n\
+                 Add-Type -AssemblyName PresentationFramework\n\
+                 [System.Windows.MessageBox]::Show($message, 'ChroniNotes Update', 'OK', 'Error') | Out-Null\n\
+               }} catch {{}}\n\
+             }} finally {{\n\
+               Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue\n\
+             }}\n",
+            installer = installer_literal,
+            install_dir = install_dir_literal,
+            pid = pid,
+        );
 
-        let batch_path = temp_dir.join("chroninotes_update.bat");
-        std::fs::write(&batch_path, &batch_content)
+        let helper_path = temp_dir.join("chroninotes_update.ps1");
+        std::fs::write(&helper_path, helper_script)
             .map_err(|e| format!("Failed to write updater script: {}", e))?;
 
         let operation: Vec<u16> = OsStr::new("open")
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
-        let file_wide: Vec<u16> = OsStr::new("cmd.exe")
+        let file_wide: Vec<u16> = OsStr::new("powershell.exe")
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
-        let params_str = format!("/c \"{}\"", batch_path.to_string_lossy());
+        let params_str = format!(
+            "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \"{}\"",
+            helper_path.to_string_lossy()
+        );
         let parameters: Vec<u16> = OsStr::new(&params_str)
             .encode_wide()
             .chain(std::iter::once(0))

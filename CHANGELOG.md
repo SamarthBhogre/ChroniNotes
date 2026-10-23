@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.4.1] - 2026-10-23
+
+### Fixed
+
+- **In-app updater installer launch:** Replaced the fragile batch launcher with a PowerShell helper that waits for ChroniNotes to exit, elevates machine-wide installations when needed, and reports installer launch failures.
+
+---
+
 ## [3.4.0] - 2026-10-23
 
 ### Added
