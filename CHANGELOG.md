@@ -30,6 +30,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Countdown date boundaries:** Countdowns now use local calendar-day calculations and refresh other views when countdown data changes.
 - **Timer tool switching:** Prevented changing timer modes while a session is running or paused.
 
+**Full Changelog:** [v3.2.0...v3.4.0](https://github.com/SamarthBhogre/ChroniNotes/compare/v3.2.0...v3.4.0)
+
+---
+
+## [3.2.0] - 2026-06-05
+
+### Added
+
+- **Universal media controls backend:** Added the Rust media provider structure under `src-tauri/src/media`.
+- **Media command set:** Added Tauri commands for current media, available sessions, play/pause, next track, and previous track.
+- **Windows GSMTC support:** Implemented Windows System Media Transport Controls using the Windows crate.
+
+### Changed
+
+- **Media player sidebar:** Replaced the Spotify sidebar component and store with the Windows media player and media store.
+- **About copy:** Updated the About page to describe universal media controls.
+- **Release version:** Bumped ChroniNotes from 3.1.0 to 3.2.0 across package, Cargo, lockfile, and Tauri metadata.
+
+### Removed
+
+- **Spotify integration:** Removed Spotify OAuth, API, and Web Playback SDK plumbing.
+- **Spotify build requirement:** Removed the Spotify compile-time environment requirement from the Tauri build script.
+
+---
+
 ## [3.1.0] - 2026-05-23
 
 ### Added
